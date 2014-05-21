@@ -1,0 +1,10 @@
+.DS_Store
+*.sqlite
+*.sh
+*.log
+*.log.*
+*.rss
+/received
+!/private
+/private/*
+!/private/sample

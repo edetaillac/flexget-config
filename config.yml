@@ -165,7 +165,7 @@ tasks:
     priority: 4
     include: 
       - private/config-t411.yml
-      - private/movies-t411.yml
+      - private/input-movies-t411.yml
       - private/config-transmission.yml
     template:
       - movies
@@ -188,7 +188,7 @@ tasks:
     priority: 10
     include:
       - private/config-t411.yml
-      - private/movies-t411.yml
+      - private/input-movies-t411.yml
       - private/config-transmission.yml 
     template:
       - movies
