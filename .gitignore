@@ -5,6 +5,6 @@
 *.log.*
 *.rss
 /received
-!/private
-/private/*
+#!/private
+#/private/*
 !/private/sample
