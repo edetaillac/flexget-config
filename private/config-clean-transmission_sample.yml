@@ -1,0 +1,6 @@
+clean_transmission:
+  host: localhost
+  port: 9091
+  username: username
+  password: password
+  finished_for: 14 days

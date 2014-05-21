@@ -1,0 +1,9 @@
+html:
+  url: "http://www.t411.me/torrents/search/?name=&description=&file=&user=&cat=210&subcat=433&page={{i}}"
+  title_from: title
+  links_re:
+    - "^http://www.t411.me/torrents/[^/]+(?!/)[^/]+$"
+  increment:
+    from: 0
+    to: 1
+    step: 1

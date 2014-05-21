@@ -1,0 +1,5 @@
+transmission:
+  host: localhost
+  port: 9091
+  username: username
+  password: password

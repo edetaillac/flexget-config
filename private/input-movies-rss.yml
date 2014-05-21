@@ -1,0 +1,7 @@
+inputs:
+  - rss: { url: 'http://kickass.to/movies/?rss=1' }
+  - rss: { url: 'http://rss.thepiratebay.se/201' }
+  - rss: { url: 'http://publichd.eu/rss.php?filter=1' }
+  - rss: { url: 'http://yify-torrents.com/rss/0/All/All/0' }
+  - rss: { url: 'http://www.torlock.com/movies/rss.xml' }
+  - rss: { url: 'http://torrentz.eu/feed_verified?q=movies' }

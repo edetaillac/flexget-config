@@ -1,0 +1,252 @@
+templates:
+  global:
+    # 10 gigas d'espace disque au minimum
+    free_space:
+      path: /home/manu/Downloads
+      space: 10000
+    # Require at least 10 seeds of any torrent
+    torrent_alive:
+      min_seeds: 10
+      reject_for: 3 hours
+    verify_ssl_certificates: no
+    # Size and seed restrictions require real torrents
+    magnets: no
+    # Limit the frequency of requests to domains so they don't complain about
+    # using a bot
+    domain_delay:
+      bt-chat.com-tv: 5 seconds
+      ezrss.it: 5 seconds
+      showrss.info-tv: 5 seconds
+      t411.me: 5 seconds
+      thepiratebay.se: 5 seconds
+      kickass.to: 5 seconds
+      rss.bt-chat.com: 5 seconds
+      publichd.eu: 5 seconds
+      yify-torrents.com: 5 seconds
+  
+  tv:
+    interval: 1 hour
+    private_torrents: no
+    series:
+      settings:
+        Default: &DEFAULT_SETTING
+          path: /home/manu/Downloads/TV-SHOWS/{{series_name}}
+          timeframe: 6 hours
+          propers: 12 hours 
+        Best:
+          <<: *DEFAULT_SETTING
+          quality: 720p
+        Good:
+          <<: *DEFAULT_SETTING
+          quality: hdtv
+      include: [ private/series.yml ]
+    # generate RSS feeds to send daily mail
+    make_rss:
+      file: /home/manu/.flexget/downloads.rss
+      days: 1
+
+  movies:
+    interval: 30 minutes
+    quality: 720p-1080p
+    regexp:
+      reject:
+        # Avoid certain groups.
+        - '(?x) [\W_] (?: maxspeed | tnt[\W_]*village | cocain | wdr | msd | nnd | thc | ssdd | crys ) $'
+        # I don't have any 3D displays
+        - \b3-?D\b
+        # Flexget doesn't recognize "line" as an audio quality.
+        - '(?x) [\W_] (?: line ) (?:\.|_|\b)'
+        # Avoid Series Episodes
+        - s\d+e\d+
+        - '(?x) [\W_] (?: screener ) (?:\.|_|\b)'
+        - '(?x) [\W_] (?: trailer ) (?:\.|_|\b)'
+        - '(?x) [\W_] (?: R5 ) (?:\.|_|\b)'                      
+        - '(?x) [\W_] (?: TS ) (?:\.|_|\b)'
+        - '(?x) [\W_] (?: WEBSCR ) (?:\.|_|\b)'                            
+        - '(?x) [\W_] (?: Cam ) (?:\.|_|\b)'
+        # Reject rar/packs/password
+        - \.rar|\.r\d\d|password.txt|\.zip
+      from: title
+    content_size: { min: 1000, max: 7000 }
+    imdb_lookup: yes
+    imdb_required: yes
+    seen_movies: strict # Don't download movies we've already seen
+    # Check for already downloaded manually
+    exists_movie:
+      - /home/manu/Downloads/
+    # generate RSS feeds to send daily mail
+    make_rss:
+      file: /home/manu/.flexget/downloads.rss
+      days: 1
+
+  movies_discover:
+    interval: 1 hour
+    if:
+      - 'imdb_year < now.year - 2': reject
+      - ? "sorted(imdb_genres or []) in [['horror'], ['music'], ['biography', 'music'],
+            ['documentary', 'music'], ['biography', 'documentary', 'music']]"
+        : reject
+      - "'musical' in (imdb_genres or [])": reject
+      # Probably a standup comedy.
+      - "'comedy' in (imdb_genres or []) and 1 == len(imdb_actors or [])": reject
+      - "'documentary' in (imdb_genres or [])": reject
+      - "'french' == (imdb_languages or ['french'])[0]":
+          set: { path: /home/manu/Downloads/MOVIES/VF }
+          imdb:
+            min_score: 5.5
+            min_votes: 200
+      - "'french' != (imdb_languages or ['french'])[0]":
+          set:
+            path: /home/manu/Downloads/MOVIES/VO
+          imdb:
+            min_score: 6
+            min_votes: 400
+            accept_languages: [english, danish, dutch, french, german, italian, norwegian, japanese ]
+          regexp:
+            reject:
+              # don't download French movies (only VO)
+              - '(?x) [\W_] (?: truefrench | fr | french | VFF | VFQ ) (?:\.|_|\b)'
+            from: [ title, url ]
+      # Restrictions Notes on specific genres
+      - "any(genre in [['drama', 'romance'], ['drama', 'war'], ['animation'], ['family']] for genre in (imdb_genres or []))":
+          imdb:
+            min_score: 7
+            min_votes: 600
+
+  movies_watchlist:
+    movie_queue: yes
+    if:
+      - "'french' == (imdb_languages or ['french'])[0]":
+          set: { path: /home/manu/Downloads/MOVIES/VF }
+      - "'french' != (imdb_languages or ['french'])[0]":
+          set:
+            path: /home/manu/Downloads/MOVIES/VO
+          regexp:
+            reject:
+              # don't download French movies (only VO)
+              - '(?x) [\W_] (?: truefrench | fr | french | VFF | VFQ ) (?:\.|_|\b)'
+            from: [ title, url ]
+                
+tasks:
+  
+  ###################
+  # TV Shows
+  ###################
+
+  TV-SHOWS:
+    priority: 1
+    include:
+      - private/input-tvshows-rss.yml
+      - private/config-transmission.yml
+    template: tv
+
+  TV-SHOWS_t411:
+    priority: 2
+    include:
+      - private/config-t411.yml
+      - private/input-tvshows-t411.yml
+      - private/config-transmission.yml
+    template: 
+      - tv
+
+  ###################
+  # Movies WatchList
+  ###################
+ 
+  queue_from_imdb_Manu:
+    priority: 3
+    include: [ private/input-watchlist-rss.yml ]
+    accept_all: yes
+    seen: local  # We don't want accepted movies on this feed to affect actual download feed
+    queue_movies:
+      quality: 720p
+
+  Movies_watchlist_t411:
+    priority: 4
+    include: 
+      - private/config-t411.yml
+      - private/movies-t411.yml
+      - private/config-transmission.yml
+    template:
+      - movies
+      - movies_watchlist
+
+  Movies_watchlist:
+    priority: 5
+    include:
+      - private/input-movies-rss.yml
+      - private/config-transmission.yml
+    template:
+      - movies
+      - movies_watchlist
+
+  ###################
+  # Movies Discover
+  ###################
+
+  Movies_discover_t411:
+    priority: 10
+    include:
+      - private/config-t411.yml
+      - private/movies-t411.yml
+      - private/config-transmission.yml 
+    template:
+      - movies
+      - movies_discover
+
+  Movies_discover:
+    priority: 10
+    include:
+      - private/input-movies-rss.yml
+      - private/config-transmission.yml
+    template:
+      - movies
+      - movies_discover
+
+  ###################
+  # Subtitles
+  ###################
+
+  Subtitles:
+    priority: 20
+    interval: 2 hours
+    find:
+      path: 
+        - /home/manu/Downloads/TV-SHOWS/
+        - /home/manu/Downloads/MOVIES/VO/
+      regexp: '.*\.(avi|mkv|mp4)$'
+      recursive: yes
+    disable_builtins: [seen, retry_failed]
+    disable_plugin: [email]
+    accept_all: yes
+    subliminal:
+      languages:
+        - fra
+      exact_match: yes
+
+  ###################
+  # EMAILS NOTIFICATIONS
+  ###################
+
+  emailfeed:
+    priority: 20
+    interval: 1 days
+    rss:
+      url: /home/manu/.flexget/downloads.rss
+    disable_builtins: [seen]
+    metainfo_series: yes # required for tvdb lookup to work, email template to function correctly
+    thetvdb_lookup: yes
+    imdb_lookup: yes
+    tmdb_lookup: yes
+    accept_all: yes
+    include: [ private/config-email.yml ]
+      
+
+  ###################
+  # TRANSMISSION CLEANUP
+  ###################
+
+  Cleanup:
+    priority: 20
+    include: [ private/config-clean-transmission.yml ]
+

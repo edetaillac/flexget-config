@@ -1,0 +1,9 @@
+inputs:
+  - rss: { url: 'http://rss.bt-chat.com/?group=3', silent: yes }
+  - rss: { url: 'http://ezrss.it/feed/', silent: yes }
+  - rss: { url: 'http://rss.thepiratebay.org/208', silent: yes }
+  - rss: { url: 'http://kat.ph/tv/?rss=1', silent: yes }
+  - rss: { url: 'http://extratorrent.com/rss.xml?cid=8', silent: yes }
+  - rss: { url: 'http://torrentz.eu/feed_verified?q=tv', silent: yes }
+  - rss: { url: 'http://showrss.info/feeds/all.rss', silent: yes }
+  - rss: { url: 'http://rss.bt-chat.com/?group=3', silent: yes }

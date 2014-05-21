@@ -1,0 +1,10 @@
+email:
+  from: email@gmail.com
+  to: email@gmail.com
+  smtp_host: smtp.gmail.com
+  smtp_port: 587
+  smtp_username: email@gmail.com
+  smtp_password: password
+  smtp_tls: yes
+  subject: Seedbox Notifications
+  template: html
