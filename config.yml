@@ -24,6 +24,19 @@ templates:
       publichd.eu: 5 seconds
       yify-torrents.com: 5 seconds
   
+  t411-config:
+    # CONFIG Cookie T411
+    plugin_priority:
+      headers: 250
+    headers:
+      User-Agent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_9_2) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/34.0.1847.137 Safari/537.36"
+      Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+      Accept-Charset: "ISO-8859-1,utf-8;q=0.7,*;q=0.3"
+      Accept-Language: "fr-FR,fr;q=0.8,en-US;q=0.6,en;q=0.4"
+      Cache-Control: "max-age=0"
+      Connection: "keep-alive"
+      Cookie: "uid=4538928; pass=895ab15e940b8306441c7e33ffd4e4fdf0af3f29; authKey=93c271936cbc36c4d02f3caa34181c0b"
+  
   tv:
     interval: 1 hour
     private_torrents: no
@@ -40,6 +53,12 @@ templates:
           <<: *DEFAULT_SETTING
           quality: hdtv
       include: [ private/series.yml ]
+    transmission:
+      enabled: yes
+      host: localhost
+      port: 9091
+      username: manu
+      password: Numa5100
     # generate RSS feeds to send daily mail
     make_rss:
       file: /home/manu/.flexget/downloads.rss
@@ -74,6 +93,12 @@ templates:
     # Check for already downloaded manually
     exists_movie:
       - /home/manu/Downloads/
+    transmission:
+      enabled: yes
+      host: localhost
+      port: 9091
+      username: manu
+      password: Numa5100
     # generate RSS feeds to send daily mail
     make_rss:
       file: /home/manu/.flexget/downloads.rss
@@ -135,19 +160,16 @@ tasks:
 
   TV-SHOWS:
     priority: 1
-    include:
-      - private/input-tvshows-rss.yml
-      - private/config-transmission.yml
+    include: [ private/input-tvshows-rss.yml ]
     template: tv
 
   TV-SHOWS_t411:
     priority: 2
-    include:
-      - private/config-t411.yml
-      - private/input-tvshows-t411.yml
-      - private/config-transmission.yml
+    include: [ private/input-tvshows-t411.yml ]
+    
     template: 
       - tv
+      - t411-config
 
   ###################
   # Movies WatchList
@@ -163,19 +185,15 @@ tasks:
 
   Movies_watchlist_t411:
     priority: 4
-    include: 
-      - private/config-t411.yml
-      - private/input-movies-t411.yml
-      - private/config-transmission.yml
+    include: [ private/input-movies-t411.yml ]
     template:
+      - t411-config
       - movies
       - movies_watchlist
 
   Movies_watchlist:
     priority: 5
-    include:
-      - private/input-movies-rss.yml
-      - private/config-transmission.yml
+    include: [ private/input-movies-rss.yml ]
     template:
       - movies
       - movies_watchlist
@@ -185,20 +203,16 @@ tasks:
   ###################
 
   Movies_discover_t411:
-    priority: 10
-    include:
-      - private/config-t411.yml
-      - private/input-movies-t411.yml
-      - private/config-transmission.yml 
+    priority: 6
+    include: [ private/input-movies-t411.yml ]    
     template:
+      - t411-config
       - movies
       - movies_discover
 
   Movies_discover:
-    priority: 10
-    include:
-      - private/input-movies-rss.yml
-      - private/config-transmission.yml
+    priority: 7
+    include: [ private/input-movies-rss.yml ]
     template:
       - movies
       - movies_discover
@@ -208,7 +222,7 @@ tasks:
   ###################
 
   Subtitles:
-    priority: 20
+    priority: 10
     interval: 2 hours
     find:
       path: 
@@ -216,6 +230,7 @@ tasks:
         - /home/manu/Downloads/MOVIES/VO/
       regexp: '.*\.(avi|mkv|mp4)$'
       recursive: yes
+    seen: local
     disable_builtins: [seen, retry_failed]
     disable_plugin: [email]
     accept_all: yes
@@ -225,11 +240,11 @@ tasks:
       exact_match: yes
 
   ###################
-  # EMAILS NOTIFICATIONS
+  # EMAILS
   ###################
 
   emailfeed:
-    priority: 20
+    priority: 15
     interval: 1 days
     rss:
       url: /home/manu/.flexget/downloads.rss
@@ -239,14 +254,27 @@ tasks:
     imdb_lookup: yes
     tmdb_lookup: yes
     accept_all: yes
-    include: [ private/config-email.yml ]
-      
+    email:
+      from: emmanuel@stateoftrance.fr
+      to: emmanuel.detaillac@gmail.com
+      smtp_host: smtp.gmail.com
+      smtp_port: 587
+      smtp_username: emmanuel@stateoftrance.fr
+      smtp_password: Numa5100
+      smtp_tls: yes
+      subject: Seedbox Notifications
+      template: html
 
   ###################
-  # TRANSMISSION CLEANUP
+  # CLEANUP
   ###################
 
   Cleanup:
     priority: 20
-    include: [ private/config-clean-transmission.yml ]
+    clean_transmission:
+      host: localhost
+      port: 9091
+      username: manu
+      password: Numa5100 
+      finished_for: 14 days
 
