@@ -128,6 +128,8 @@ templates:
             min_votes: 400
             accept_languages: [english, danish, dutch, french, german, italian, norwegian, japanese ]
           regexp:
+            reject_excluding:
+              - '(?x) [\W_] (?: VOSTFR | MULTISUB ) (?:\.|_|\b)'
             reject:
               # don't download French movies (only VO)
               - '(?x) [\W_] (?: truefrench | fr | french | VFF | VFQ ) (?:\.|_|\b)'
@@ -147,6 +149,8 @@ templates:
           set:
             path: /home/manu/Downloads/MOVIES/VO
           regexp:
+            reject_excluding:
+              - '(?x) [\W_] (?: VOSTFR | Multisub ) (?:\.|_|\b)'
             reject:
               # don't download French movies (only VO)
               - '(?x) [\W_] (?: truefrench | fr | french | VFF | VFQ ) (?:\.|_|\b)'
@@ -228,8 +232,12 @@ tasks:
       path: 
         - /home/manu/Downloads/TV-SHOWS/
         - /home/manu/Downloads/MOVIES/VO/
-      regexp: '.*\.(avi|mkv|mp4)$'
       recursive: yes
+    regexp: 
+      accept:
+        - '.*\.(avi|mkv|mp4)$':
+            not:
+              - '(?x) [\W_] (?: VOSTFR | Multisub ) (?:\.|_|\b)'
     seen: local
     disable_builtins: [seen, retry_failed]
     disable_plugin: [email]
