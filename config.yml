@@ -24,19 +24,6 @@ templates:
       publichd.eu: 5 seconds
       yify-torrents.com: 5 seconds
   
-  t411-config:
-    # CONFIG Cookie T411
-    plugin_priority:
-      headers: 250
-    headers:
-      User-Agent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_9_2) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/34.0.1847.137 Safari/537.36"
-      Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
-      Accept-Charset: "ISO-8859-1,utf-8;q=0.7,*;q=0.3"
-      Accept-Language: "fr-FR,fr;q=0.8,en-US;q=0.6,en;q=0.4"
-      Cache-Control: "max-age=0"
-      Connection: "keep-alive"
-      Cookie: "uid=4538928; pass=895ab15e940b8306441c7e33ffd4e4fdf0af3f29; authKey=93c271936cbc36c4d02f3caa34181c0b"
-  
   tv:
     interval: 1 hour
     private_torrents: no
@@ -53,12 +40,6 @@ templates:
           <<: *DEFAULT_SETTING
           quality: hdtv
       include: [ private/series.yml ]
-    transmission:
-      enabled: yes
-      host: localhost
-      port: 9091
-      username: manu
-      password: Numa5100
     # generate RSS feeds to send daily mail
     make_rss:
       file: /home/manu/.flexget/downloads.rss
@@ -93,12 +74,6 @@ templates:
     # Check for already downloaded manually
     exists_movie:
       - /home/manu/Downloads/
-    transmission:
-      enabled: yes
-      host: localhost
-      port: 9091
-      username: manu
-      password: Numa5100
     # generate RSS feeds to send daily mail
     make_rss:
       file: /home/manu/.flexget/downloads.rss
@@ -128,11 +103,10 @@ templates:
             min_votes: 400
             accept_languages: [english, danish, dutch, french, german, italian, norwegian, japanese ]
           regexp:
-            reject_excluding:
-              - '(?x) [\W_] (?: VOSTFR | MULTISUB ) (?:\.|_|\b)'
             reject:
               # don't download French movies (only VO)
               - '(?x) [\W_] (?: truefrench | fr | french | VFF | VFQ ) (?:\.|_|\b)'
+            # TODO: ACCEPT VOSTFR | MULTISUB
             from: [ title, url ]
       # Restrictions Notes on specific genres
       - "any(genre in [['drama', 'romance'], ['drama', 'war'], ['animation'], ['family']] for genre in (imdb_genres or []))":
@@ -149,11 +123,10 @@ templates:
           set:
             path: /home/manu/Downloads/MOVIES/VO
           regexp:
-            reject_excluding:
-              - '(?x) [\W_] (?: VOSTFR | Multisub ) (?:\.|_|\b)'
             reject:
               # don't download French movies (only VO)
               - '(?x) [\W_] (?: truefrench | fr | french | VFF | VFQ ) (?:\.|_|\b)'
+            # TODO: ACCEPT VOSTFR | MULTISUB
             from: [ title, url ]
                 
 tasks:
@@ -164,16 +137,19 @@ tasks:
 
   TV-SHOWS:
     priority: 1
-    include: [ private/input-tvshows-rss.yml ]
+    include:
+      - private/input-tvshows-rss.yml
+      - private/config-transmission.yml
     template: tv
 
   TV-SHOWS_t411:
     priority: 2
-    include: [ private/input-tvshows-t411.yml ]
-    
+    include:
+      - private/config-t411.yml
+      - private/input-tvshows-t411.yml
+      - private/config-transmission.yml
     template: 
       - tv
-      - t411-config
 
   ###################
   # Movies WatchList
@@ -189,15 +165,19 @@ tasks:
 
   Movies_watchlist_t411:
     priority: 4
-    include: [ private/input-movies-t411.yml ]
+    include: 
+      - private/config-t411.yml
+      - private/input-movies-t411.yml
+      - private/config-transmission.yml
     template:
-      - t411-config
       - movies
       - movies_watchlist
 
   Movies_watchlist:
     priority: 5
-    include: [ private/input-movies-rss.yml ]
+    include:
+      - private/input-movies-rss.yml
+      - private/config-transmission.yml
     template:
       - movies
       - movies_watchlist
@@ -208,15 +188,19 @@ tasks:
 
   Movies_discover_t411:
     priority: 6
-    include: [ private/input-movies-t411.yml ]    
+    include:
+      - private/config-t411.yml
+      - private/input-movies-t411.yml
+      - private/config-transmission.yml 
     template:
-      - t411-config
       - movies
       - movies_discover
 
   Movies_discover:
     priority: 7
-    include: [ private/input-movies-rss.yml ]
+    include:
+      - private/input-movies-rss.yml
+      - private/config-transmission.yml
     template:
       - movies
       - movies_discover
@@ -232,12 +216,8 @@ tasks:
       path: 
         - /home/manu/Downloads/TV-SHOWS/
         - /home/manu/Downloads/MOVIES/VO/
+      regexp: '.*\.(avi|mkv|mp4)$'
       recursive: yes
-    regexp: 
-      accept:
-        - '.*\.(avi|mkv|mp4)$':
-            not:
-              - '(?x) [\W_] (?: VOSTFR | Multisub ) (?:\.|_|\b)'
     seen: local
     disable_builtins: [seen, retry_failed]
     disable_plugin: [email]
@@ -248,7 +228,7 @@ tasks:
       exact_match: yes
 
   ###################
-  # EMAILS
+  # EMAILS NOTIFICATIONS
   ###################
 
   emailfeed:
@@ -262,27 +242,14 @@ tasks:
     imdb_lookup: yes
     tmdb_lookup: yes
     accept_all: yes
-    email:
-      from: emmanuel@stateoftrance.fr
-      to: emmanuel.detaillac@gmail.com
-      smtp_host: smtp.gmail.com
-      smtp_port: 587
-      smtp_username: emmanuel@stateoftrance.fr
-      smtp_password: Numa5100
-      smtp_tls: yes
-      subject: Seedbox Notifications
-      template: html
+    include: [ private/config-email.yml ]
+      
 
   ###################
-  # CLEANUP
+  # TRANSMISSION CLEANUP
   ###################
 
   Cleanup:
     priority: 20
-    clean_transmission:
-      host: localhost
-      port: 9091
-      username: manu
-      password: Numa5100 
-      finished_for: 14 days
+    include: [ private/config-clean-transmission.yml ]
 
