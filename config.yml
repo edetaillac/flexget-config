@@ -64,6 +64,7 @@ templates:
         - '(?x) [\W_] (?: TS ) (?:\.|_|\b)'
         - '(?x) [\W_] (?: WEBSCR ) (?:\.|_|\b)'                            
         - '(?x) [\W_] (?: Cam ) (?:\.|_|\b)'
+        - '(?x) [\W_] (?: CamRip ) (?:\.|_|\b)'
         # Reject rar/packs/password
         - \.rar|\.r\d\d|password.txt|\.zip
       from: title
@@ -74,6 +75,19 @@ templates:
     # Check for already downloaded manually
     exists_movie:
       - /home/manu/Downloads/
+    if:
+      - "'french' == (imdb_languages or ['french'])[0]":
+          set: { path: /home/manu/Downloads/MOVIES/VF }
+      - "'french' != (imdb_languages or ['french'])[0]":
+          set: { path: /home/manu/Downloads/MOVIES/VO }
+          regexp:
+            reject:
+              # don't download French movies (only VO)
+              - '(?x) [\W_] (?: truefrench | fr | french | VFF | VFQ ) (?:\.|_|\b)':
+                  not:
+                    # Accept VOSTFR/MultiSub
+                    - '(?x) [\W_] (?: VOSTFR | MULTISUB ) (?:\.|_|\b)'
+            from: [ title, url ]
     # generate RSS feeds to send daily mail
     make_rss:
       file: /home/manu/.flexget/downloads.rss
@@ -83,31 +97,20 @@ templates:
     interval: 1 hour
     if:
       - 'imdb_year < now.year - 2': reject
-      - ? "sorted(imdb_genres or []) in [['horror'], ['music'], ['biography', 'music'],
-            ['documentary', 'music'], ['biography', 'documentary', 'music']]"
-        : reject
+      - "'horror' in (imdb_genres or [])": reject
       - "'musical' in (imdb_genres or [])": reject
+      - "'documentary' in (imdb_genres or [])": reject
       # Probably a standup comedy.
       - "'comedy' in (imdb_genres or []) and 1 == len(imdb_actors or [])": reject
-      - "'documentary' in (imdb_genres or [])": reject
       - "'french' == (imdb_languages or ['french'])[0]":
-          set: { path: /home/manu/Downloads/MOVIES/VF }
           imdb:
             min_score: 5.5
             min_votes: 200
       - "'french' != (imdb_languages or ['french'])[0]":
-          set:
-            path: /home/manu/Downloads/MOVIES/VO
           imdb:
             min_score: 6
             min_votes: 400
-            accept_languages: [english, danish, dutch, french, german, italian, norwegian, japanese ]
-          regexp:
-            reject:
-              # don't download French movies (only VO)
-              - '(?x) [\W_] (?: truefrench | fr | french | VFF | VFQ ) (?:\.|_|\b)'
-            # TODO: ACCEPT VOSTFR | MULTISUB
-            from: [ title, url ]
+            accept_languages: [english, danish, dutch, spanish, german, italian, norwegian, japanese ]
       # Restrictions Notes on specific genres
       - "any(genre in [['drama', 'romance'], ['drama', 'war'], ['animation'], ['family']] for genre in (imdb_genres or []))":
           imdb:
@@ -116,18 +119,6 @@ templates:
 
   movies_watchlist:
     movie_queue: yes
-    if:
-      - "'french' == (imdb_languages or ['french'])[0]":
-          set: { path: /home/manu/Downloads/MOVIES/VF }
-      - "'french' != (imdb_languages or ['french'])[0]":
-          set:
-            path: /home/manu/Downloads/MOVIES/VO
-          regexp:
-            reject:
-              # don't download French movies (only VO)
-              - '(?x) [\W_] (?: truefrench | fr | french | VFF | VFQ ) (?:\.|_|\b)'
-            # TODO: ACCEPT VOSTFR | MULTISUB
-            from: [ title, url ]
                 
 tasks:
   
@@ -216,8 +207,12 @@ tasks:
       path: 
         - /home/manu/Downloads/TV-SHOWS/
         - /home/manu/Downloads/MOVIES/VO/
-      regexp: '.*\.(avi|mkv|mp4)$'
       recursive: yes
+    regexp: 
+      accept:
+        - '.*\.(avi|mkv|mp4)$':
+            not:
+              - '(?x) [\W_] (?: VOSTFR | Multisub ) (?:\.|_|\b)'
     seen: local
     disable_builtins: [seen, retry_failed]
     disable_plugin: [email]
