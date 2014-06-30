@@ -1,23 +1,14 @@
-# The following separate config files are used for private configurations:
-#   * private.yml   - deluge / transmission account
-#   * series.yml    - list of the shows in which I'm interested
-
 templates:
   global:
     # 10 gigas d'espace disque au minimum
     free_space:
       path: /home/manu/Downloads
       space: 10000
-    # Require at least 30 seeds of any torrent
+    # Require at least 10 seeds of any torrent
     torrent_alive:
-      min_seeds: 30
+      min_seeds: 10
       reject_for: 3 hours
     verify_ssl_certificates: no
-    deluge:
-      main_file_only: yes
-      path: /home/manu/Downloads/incomplete
-      ratio: 4
-      removeatratio: yes
     # Size and seed restrictions require real torrents
     magnets: no
     # Limit the frequency of requests to domains so they don't complain about
@@ -39,6 +30,7 @@ templates:
     series:
       settings:
         Default: &DEFAULT_SETTING
+          path: /home/manu/Downloads/TV-SHOWS/{{series_name}}
           timeframe: 6 hours
           propers: 12 hours 
         Best:
@@ -47,19 +39,7 @@ templates:
         Good:
           <<: *DEFAULT_SETTING
           quality: hdtv
-      #include: [ private/series.yml ]
-      Best:  
-        - The Big Bang Theory:
-            alternate_name: Big Bang Theory
-        - Game of Thrones
-        - True Detective
-        - Helix
-        - Homeland
-        - Sherlock
-    deluge:
-      content_filename: "{{series_name}} - {{series_id}} - {{quality}}"
-      movedone: "/home/manu/Downloads/TV-SHOWS/{{series_name}}/Season {{series_season}}/"
-      label: tv-shows
+      include: [ private/series.yml ]
     # generate RSS feeds to send daily mail
     make_rss:
       file: /home/manu/.flexget/downloads.rss
@@ -67,7 +47,7 @@ templates:
 
   movies:
     interval: 30 minutes
-    quality: 720p+ hdtv+ 
+    quality: 720p-1080p
     regexp:
       reject:
         # Avoid certain groups.
@@ -97,13 +77,9 @@ templates:
       - /home/manu/Downloads/
     if:
       - "'french' == (imdb_languages or ['french'])[0]":
-          set:
-            content_filename: "{{ imdb_name|replace('/', '_')|replace(':', ' -') }} ({{ imdb_year }}) - {{ quality }}"
-            movedone: "/home/manu/Downloads/MOVIES/VF/"
+          set: { path: /home/manu/Downloads/MOVIES/VF }
       - "'french' != (imdb_languages or ['french'])[0]":
-          set:
-            content_filename: "{{ imdb_name|replace('/', '_')|replace(':', ' -') }} ({{ imdb_year }}) - {{ quality }}"
-            movedone: "/home/manu/Downloads/MOVIES/VO/"
+          set: { path: /home/manu/Downloads/MOVIES/VO }
           regexp:
             reject:
               # don't download French movies (only VO)
@@ -111,7 +87,7 @@ templates:
                   not:
                     # Accept VOSTFR/MultiSub
                     - '(?x) [\W_] (?: VOSTFR | MULTISUB ) (?:\.|_|\b)'
-            from: title
+            from: [ title, url ]
     # generate RSS feeds to send daily mail
     make_rss:
       file: /home/manu/.flexget/downloads.rss
@@ -119,8 +95,6 @@ templates:
 
   movies_discover:
     interval: 1 hour
-    set:
-      label: movies-discover
     if:
       - 'imdb_year < now.year - 2': reject
       - "'horror' in (imdb_genres or [])": reject
@@ -129,37 +103,21 @@ templates:
       # Probably a standup comedy.
       - "'comedy' in (imdb_genres or []) and 1 == len(imdb_actors or [])": reject
       - "'french' == (imdb_languages or ['french'])[0]":
-          set:
-            content_filename: "{{ imdb_name|replace('/', '_')|replace(':', ' -') }} ({{ imdb_year }}) - {{ quality }}"
-            movedone: "/home/manu/Downloads/MOVIES/VF/"
           imdb:
-            min_score: 6.5
+            min_score: 5.5
             min_votes: 200
       - "'french' != (imdb_languages or ['french'])[0]":
-          set:
-            content_filename: "{{ imdb_name|replace('/', '_')|replace(':', ' -') }} ({{ imdb_year }}) - {{ quality }}"
-            movedone: "/home/manu/Downloads/MOVIES/VO/"
           imdb:
-            min_score: 7
+            min_score: 6
             min_votes: 400
             accept_languages: [english, danish, dutch, spanish, german, italian, norwegian, japanese ]
       # Restrictions Notes on specific genres
-      - "set(['drama', 'romance']).issubset(set(imdb_genres or []))":
+      - "any(genre in [['drama', 'romance'], ['drama', 'war'], ['animation'], ['family']] for genre in (imdb_genres or []))":
           imdb:
-            min_score: 7.5
-            min_votes: 600
-      - "set(['drama', 'war']).issubset(set(imdb_genres or []))":
-          imdb:
-            min_score: 7.5
-            min_votes: 600
-      - "set(['animation', 'family']).issubset(set(imdb_genres or []))":
-          imdb:
-            min_score: 7.5
+            min_score: 7
             min_votes: 600
 
   movies_watchlist:
-    set:
-      label: movies-watchlist
     movie_queue: yes
                 
 tasks:
@@ -172,7 +130,7 @@ tasks:
     priority: 1
     include:
       - private/input-tvshows-rss.yml
-      #- private/config-transmission.yml
+      - private/config-transmission.yml
     template: tv
 
   TV-SHOWS_t411:
@@ -180,7 +138,7 @@ tasks:
     include:
       - private/config-t411.yml
       - private/input-tvshows-t411.yml
-      #- private/config-transmission.yml
+      - private/config-transmission.yml
     template: 
       - tv
 
@@ -194,14 +152,14 @@ tasks:
     accept_all: yes
     seen: local  # We don't want accepted movies on this feed to affect actual download feed
     queue_movies:
-      quality: 720p+ hdtv+
+      quality: 720p
 
   Movies_watchlist_t411:
     priority: 4
     include: 
       - private/config-t411.yml
       - private/input-movies-t411.yml
-      #- private/config-transmission.yml
+      - private/config-transmission.yml
     template:
       - movies
       - movies_watchlist
@@ -210,7 +168,7 @@ tasks:
     priority: 5
     include:
       - private/input-movies-rss.yml
-      #- private/config-transmission.yml
+      - private/config-transmission.yml
     template:
       - movies
       - movies_watchlist
@@ -224,7 +182,7 @@ tasks:
     include:
       - private/config-t411.yml
       - private/input-movies-t411.yml
-      #- private/config-transmission.yml 
+      - private/config-transmission.yml 
     template:
       - movies
       - movies_discover
@@ -233,7 +191,7 @@ tasks:
     priority: 7
     include:
       - private/input-movies-rss.yml
-      #- private/config-transmission.yml
+      - private/config-transmission.yml
     template:
       - movies
       - movies_discover
@@ -248,22 +206,21 @@ tasks:
     find:
       path: 
         - /home/manu/Downloads/TV-SHOWS/
-        #- /home/manu/Downloads/MOVIES/VO/
+        - /home/manu/Downloads/MOVIES/VO/
       recursive: yes
-    accept_all: yes
-    seen: local
-    disable_builtins: [seen, retry_failed]
-    disable_plugin: [deluge]
     regexp: 
-      reject_excluding:
+      accept:
         - '.*\.(avi|mkv|mp4)$':
             not:
-              - '(?x) [\W_] (?: VOSTFR | Multi | Multisub | sample ) (?:\.|_|\b)'
-      from: url
+              - '(?x) [\W_] (?: VOSTFR | Multisub ) (?:\.|_|\b)'
+    seen: local
+    disable_builtins: [seen, retry_failed]
+    disable_plugin: [email]
+    accept_all: yes
     subliminal:
       languages:
         - fra
-      exact_match: no
+      exact_match: yes
 
   ###################
   # EMAILS NOTIFICATIONS
@@ -274,8 +231,7 @@ tasks:
     interval: 1 days
     rss:
       url: /home/manu/.flexget/downloads.rss
-    disable_builtins: [seen, retry_failed]
-    disable_plugin: [deluge]
+    disable_builtins: [seen]
     metainfo_series: yes # required for tvdb lookup to work, email template to function correctly
     thetvdb_lookup: yes
     imdb_lookup: yes
@@ -288,7 +244,7 @@ tasks:
   # TRANSMISSION CLEANUP
   ###################
 
-  #Cleanup:
-  #  priority: 20
-  #  include: [ private/config-clean-transmission.yml ]
+  Cleanup:
+    priority: 20
+    include: [ private/config-clean-transmission.yml ]
 
