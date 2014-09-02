@@ -22,6 +22,8 @@ templates:
     magnets: no
     # Limit the frequency of requests to domains so they don't complain about
     # using a bot
+    headers:
+      User-Agent: "Mozilla/5.0 (Windows NT 6.1; rv:13.0) Gecko/20100101 Firefox/13.0.1"
     domain_delay:
       bt-chat.com-tv: 5 seconds
       ezrss.it: 5 seconds
@@ -56,6 +58,9 @@ templates:
         - Helix
         - Homeland
         - Sherlock
+        - Better Call Saul
+        - vikings:
+            begin: S03E01
     deluge:
       content_filename: "{{series_name}} - {{series_id}} - {{quality}}"
       movedone: "/home/manu/Downloads/TV-SHOWS/{{series_name}}/Season {{series_season}}/"
@@ -192,6 +197,7 @@ tasks:
     priority: 3
     include: [ private/input-watchlist-rss.yml ]
     accept_all: yes
+    disable_plugin: [download, deluge, remember_rejected]
     seen: local  # We don't want accepted movies on this feed to affect actual download feed
     queue_movies:
       quality: 720p+ hdtv+
@@ -248,7 +254,7 @@ tasks:
     find:
       path: 
         - /home/manu/Downloads/TV-SHOWS/
-        #- /home/manu/Downloads/MOVIES/VO/
+        - /home/manu/Downloads/MOVIES/VO/
       recursive: yes
     accept_all: yes
     seen: local
