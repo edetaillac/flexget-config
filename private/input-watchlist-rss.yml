@@ -1,1 +1,4 @@
-rss: http://rss.imdb.com/user/ur50604156/watchlist
+imdb_list:
+  user_id: ur50604156
+  list: watchlist
+#rss: http://rss.imdb.com/user/ur50604156/watchlist

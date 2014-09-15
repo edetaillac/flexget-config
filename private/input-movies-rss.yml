@@ -1,7 +1,10 @@
 inputs:
-  - rss: { url: 'http://kickass.to/movies/?rss=1' }
-  - rss: { url: 'http://rss.thepiratebay.se/201' }
-  - rss: { url: 'http://yify-torrents.com/rss/0/All/All/0' }
-  - rss: { url: 'http://www.torlock.com/movies/rss.xml' }
-  - rss: { url: 'http://torrentz.eu/feed_verified?q=movies' }
-  #- rss: { url: 'http://publichd.eu/rss.php?filter=1' }
+  - rss: { url: 'http://kickass.to/movies/?rss=1', silent: yes }
+  - rss: { url: 'http://rss.thepiratebay.se/201', silent: yes }
+  - rss: { url: 'http://extratorrent.cc/rss.xml?cid=4&type=last', silent: yes }
+  - rss: { url: 'http://www.omgtorrent.com/rss/rss-films.php', silent: yes }
+  - rss: { url: 'http://yify-torrents.com/rss/0/All/All/0', silent: yes }
+  - rss: { url: 'http://www.torlock.com/movies/rss.xml', silent: yes }
+  #- rss: { url: 'http://torrentz.eu/feed_verified?q=movies', silent: yes }
+  #- rss: { url: 'http://bitsnoop.com/new_video.html?fmt=rss', silent: yes }
+  #- rss: { url: 'http://publichd.eu/rss.php?filter=1', silent: yes }

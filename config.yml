@@ -10,7 +10,7 @@ templates:
       space: 10000
     # Require at least 30 seeds of any torrent
     torrent_alive:
-      min_seeds: 30
+      min_seeds: 20
       reject_for: 3 hours
     verify_ssl_certificates: no
     deluge:
@@ -31,9 +31,10 @@ templates:
       t411.me: 5 seconds
       thepiratebay.se: 5 seconds
       kickass.to: 5 seconds
-      rss.bt-chat.com: 5 seconds
+      bt-chat.com: 5 seconds
       publichd.eu: 5 seconds
       yify-torrents.com: 5 seconds
+      torrentz.eu: 10 seconds
   
   tv:
     interval: 1 hour
@@ -61,6 +62,8 @@ templates:
         - Better Call Saul
         - vikings:
             begin: S03E01
+        - Broadchurch:
+            begin: S02E01
     deluge:
       content_filename: "{{series_name}} - {{series_id}} - {{quality}}"
       movedone: "/home/manu/Downloads/TV-SHOWS/{{series_name}}/Season {{series_season}}/"
@@ -169,6 +172,26 @@ templates:
                 
 tasks:
   
+  DropboxTorrent:
+    disable_builtins: yes
+    disable_plugin:
+      - inputs
+      - regexp
+      - content_size
+      - torrent_alive
+    find:
+      path: '/home/manu/Dropbox/torrents'
+      regexp: '.*\.torrent$'
+      recursive: yes
+    no_entries_ok: yes
+    exec:
+      on_output:
+        for_accepted: rm "{{location}}"
+    accept_all: yes
+    set:
+      label: dropbox-torrent
+      movedone: "/home/manu/Downloads"
+
   ###################
   # TV Shows
   ###################
@@ -277,7 +300,6 @@ tasks:
 
   emailfeed:
     priority: 15
-    interval: 1 days
     rss:
       url: /home/manu/.flexget/downloads.rss
     disable_builtins: [seen, retry_failed]
@@ -297,4 +319,42 @@ tasks:
   #Cleanup:
   #  priority: 20
   #  include: [ private/config-clean-transmission.yml ]
+
+schedules:
+    
+  #
+  # Local
+  #
+  - tasks: [DropboxTorrent]
+    interval:
+      minutes: 5
+  
+  #
+  # Notifications
+  #
+  - tasks: [emailfeed]
+    interval:
+      days: 1
+
+  #
+  # IMDB List & Subtitles
+  #
+  - tasks: [queue_from_imdb_Manu, Subtitles]
+    interval:
+      hours: 2
+      
+  #
+  # Tv Shows
+  #
+  - tasks: [TV-SHOWS, TV-SHOWS_t411]
+    interval:
+      hours: 1
+      
+  #
+  # Movies
+  #
+  - tasks: [Movies_watchlist_t411, Movies_watchlist, Movies_discover_t411, Movies_discover]
+    interval:
+      minutes: 30
+  
 
