@@ -10,8 +10,8 @@ templates:
       space: 10000
     # Require at least 30 seeds of any torrent
     torrent_alive:
-      min_seeds: 20
-      reject_for: 3 hours
+      min_seeds: 10
+      reject_for: 2 hours
     verify_ssl_certificates: no
     deluge:
       main_file_only: yes
@@ -172,13 +172,31 @@ templates:
                 
 tasks:
   
+  PressTorrent:
+    include:
+      - private/config-t411.yml
+      - private/input-press.yml
+    disable_plugin: 
+      - inputs
+      - regexp
+      - content_size
+      - torrent_alive
+    accept_all: yes
+    exists:
+      - "/home/manu/Dropbox/Presse"
+    set:
+      movedone: "/home/manu/Dropbox/Presse"
+
   DropboxTorrent:
+    priority: 1
     disable_builtins: yes
     disable_plugin:
       - inputs
       - regexp
       - content_size
       - torrent_alive
+    plugin_priority:
+      exec: 0
     find:
       path: '/home/manu/Dropbox/torrents'
       regexp: '.*\.torrent$'
@@ -189,7 +207,6 @@ tasks:
         for_accepted: rm "{{location}}"
     accept_all: yes
     set:
-      label: dropbox-torrent
       movedone: "/home/manu/Downloads"
 
   ###################
@@ -197,14 +214,14 @@ tasks:
   ###################
 
   TV-SHOWS:
-    priority: 1
+    priority: 2
     include:
       - private/input-tvshows-rss.yml
       #- private/config-transmission.yml
     template: tv
 
   TV-SHOWS_t411:
-    priority: 2
+    priority: 3
     include:
       - private/config-t411.yml
       - private/input-tvshows-t411.yml
@@ -217,7 +234,21 @@ tasks:
   ###################
  
   queue_from_imdb_Manu:
-    priority: 3
+    priority: 4
+    include: [ private/input-watchlist-rss.yml ]
+    accept_all: yes
+    disable_plugin: [download, deluge, remember_rejected]
+    seen: local  # We don't want accepted movies on this feed to affect actual download feed
+    queue_movies:
+    template: 
+      - tv
+
+  ###################
+  # Movies WatchList
+  ###################
+ 
+  queue_from_imdb_Manu:
+    priority: 4
     include: [ private/input-watchlist-rss.yml ]
     accept_all: yes
     disable_plugin: [download, deluge, remember_rejected]
@@ -226,7 +257,7 @@ tasks:
       quality: 720p+ hdtv+
 
   Movies_watchlist_t411:
-    priority: 4
+    priority: 5
     include: 
       - private/config-t411.yml
       - private/input-movies-t411.yml
@@ -235,8 +266,23 @@ tasks:
       - movies
       - movies_watchlist
 
-  Movies_watchlist:
+  Movies_watchlist_cpasbien:
     priority: 5
+    inputs:
+      - html:
+          url: "http://www.cpasbien.pe/view_cat.php?categorie=films"
+          links_re:
+            - 'http://www.cpasbien.pe/dl-torrent/films/(?P<abc>[0-9a-z-]+)/(?P<name>[0-9a-z-]+).html'
+    urlrewrite:
+      CPASBIENRSS:
+        regexp: 'http://www.cpasbien.pe/dl-torrent/films/(?P<abc>[0-9a-z-]+)/(?P<name>[0-9a-z-]+).html'
+        format: 'http://www.cpasbien.pe/_torrents/\g<name>.torrent'
+    template:
+      - movies
+      - movies_watchlist
+
+  Movies_watchlist:
+    priority: 6
     include:
       - private/input-movies-rss.yml
       #- private/config-transmission.yml
@@ -249,7 +295,7 @@ tasks:
   ###################
 
   Movies_discover_t411:
-    priority: 6
+    priority: 7
     include:
       - private/config-t411.yml
       - private/input-movies-t411.yml
@@ -258,8 +304,23 @@ tasks:
       - movies
       - movies_discover
 
+  Movies_discover_cpasbien:
+    priority: 5
+    inputs:
+      - html:
+          url: "http://www.cpasbien.pe/view_cat.php?categorie=films"
+          links_re:
+            - 'http://www.cpasbien.pe/dl-torrent/films/(?P<abc>[0-9a-z-]+)/(?P<name>[0-9a-z-]+).html'
+    urlrewrite:
+      CPASBIENRSS:
+        regexp: 'http://www.cpasbien.pe/dl-torrent/films/(?P<abc>[0-9a-z-]+)/(?P<name>[0-9a-z-]+).html'
+        format: 'http://www.cpasbien.pe/_torrents/\g<name>.torrent'
+    template:
+      - movies
+      - movies_discover
+
   Movies_discover:
-    priority: 7
+    priority: 8
     include:
       - private/input-movies-rss.yml
       #- private/config-transmission.yml
@@ -332,7 +393,7 @@ schedules:
   #
   # Notifications
   #
-  - tasks: [emailfeed]
+  - tasks: [emailfeed, PressTorrent]
     interval:
       days: 1
 
@@ -349,12 +410,10 @@ schedules:
   - tasks: [TV-SHOWS, TV-SHOWS_t411]
     interval:
       hours: 1
-      
+
   #
   # Movies
   #
   - tasks: [Movies_watchlist_t411, Movies_watchlist, Movies_discover_t411, Movies_discover]
     interval:
       minutes: 30
-  
-
