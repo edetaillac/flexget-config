@@ -1,12 +1,9 @@
-# The following separate config files are used for private configurations:
-#   * private.yml   - deluge / transmission account
-#   * series.yml    - list of the shows in which I'm interested
-
+secrets: private/secretfile.yml
 templates:
   global:
     # 10 gigas d'espace disque au minimum
     free_space:
-      path: /home/manu/Downloads
+      path: '{{secrets.download.defaultPath}}'
       space: 10000
     # Require at least 30 seeds of any torrent
     torrent_alive:
@@ -15,8 +12,8 @@ templates:
     verify_ssl_certificates: no
     deluge:
       main_file_only: yes
-      path: /home/manu/Downloads/incomplete
-      ratio: 4
+      path: '{{ secrets.deluge.path }}'
+      ratio: 6
       removeatratio: yes
     # Size and seed restrictions require real torrents
     magnets: no
@@ -25,57 +22,40 @@ templates:
     headers:
       User-Agent: "Mozilla/5.0 (Windows NT 6.1; rv:13.0) Gecko/20100101 Firefox/13.0.1"
     domain_delay:
-      bt-chat.com-tv: 5 seconds
-      ezrss.it: 5 seconds
-      showrss.info-tv: 5 seconds
-      t411.me: 5 seconds
-      thepiratebay.se: 5 seconds
-      kickass.to: 5 seconds
-      bt-chat.com: 5 seconds
-      publichd.eu: 5 seconds
-      yify-torrents.com: 5 seconds
       torrentz.eu: 10 seconds
+      bt-chat.com-tv: 5 seconds
+      bt-chat.com: 5 seconds
+      ezrss.it: 2 seconds
+      showrss.info-tv: 2 seconds
+      t411.me: 2 seconds
+      thepiratebay.se: 2 seconds
+      kickass.to: 2 seconds
+      publichd.eu: 2 seconds
+      yify-torrents.com: 2 seconds
   
   tv:
-    interval: 1 hour
     private_torrents: no
-    series:
-      settings:
-        Default: &DEFAULT_SETTING
-          timeframe: 6 hours
-          propers: 12 hours 
-        Best:
-          <<: *DEFAULT_SETTING
-          quality: 720p
-        Good:
-          <<: *DEFAULT_SETTING
-          quality: hdtv
-      #include: [ private/series.yml ]
-      Best:  
-        - The Big Bang Theory:
-            alternate_name: Big Bang Theory
-        - Game of Thrones
-        - True Detective
-        - Helix
-        - Homeland
-        - Sherlock
-        - Better Call Saul
-        - vikings:
-            begin: S03E01
-        - Broadchurch:
-            begin: S02E01
+    tmdb_lookup: yes
+    include:
+      - private/series.yml
     deluge:
       content_filename: "{{series_name}} - {{series_id}} - {{quality}}"
-      movedone: "/home/manu/Downloads/TV-SHOWS/{{series_name}}/Season {{series_season}}/"
+      movedone: '{{secrets.deluge.series_movedone}}'
       label: tv-shows
-    # generate RSS feeds to send daily mail
-    make_rss:
-      file: /home/manu/.flexget/downloads.rss
-      days: 1
+    # Push notification Mobile
+    pushbullet:
+      apikey: '{{ secrets.pushbullet.apikey }}'
+      #device: '{{ secrets.pushbullet.device }}'
+      title: "{{series_name}} {{series_id}}"
+      body: "{{series_name}} {{series_id}}\n\n{{title}}\n\nSize: {{content_size}}MB" 
+    # generate RSS feed to send daily mail
+    #make_rss:
+    #  file: '{{ secrets.rss.file }}'
+    #  days: 1
 
   movies:
-    interval: 30 minutes
-    quality: 720p+ hdtv+ 
+    quality: 720p+ hdtv+
+    content_size: { min: 1000, max: 7000 }
     regexp:
       reject:
         # Avoid certain groups.
@@ -96,22 +76,23 @@ templates:
         # Reject rar/packs/password
         - \.rar|\.r\d\d|password.txt|\.zip
       from: title
-    content_size: { min: 1000, max: 7000 }
+    seen_movies: strict # Don't download movies we've already seen
+    # Check for already downloaded manually movies
+    exists_movie:
+      - '{{ secrets.download.defaultPath }}'
+      - '{{ secrets.movies.pathVF }}'
+      - '{{ secrets.movies.pathVO }}'
     imdb_lookup: yes
     imdb_required: yes
-    seen_movies: strict # Don't download movies we've already seen
-    # Check for already downloaded manually
-    exists_movie:
-      - /home/manu/Downloads/
     if:
       - "'french' == (imdb_languages or ['french'])[0]":
           set:
             content_filename: "{{ imdb_name|replace('/', '_')|replace(':', ' -') }} ({{ imdb_year }}) - {{ quality }}"
-            movedone: "/home/manu/Downloads/MOVIES/VF/"
+            movedone: '{{ secrets.movies.pathVF }}'
       - "'french' != (imdb_languages or ['french'])[0]":
           set:
             content_filename: "{{ imdb_name|replace('/', '_')|replace(':', ' -') }} ({{ imdb_year }}) - {{ quality }}"
-            movedone: "/home/manu/Downloads/MOVIES/VO/"
+            movedone: '{{ secrets.movies.pathVO }}'
           regexp:
             reject:
               # don't download French movies (only VO)
@@ -120,17 +101,20 @@ templates:
                     # Accept VOSTFR/MultiSub
                     - '(?x) [\W_] (?: VOSTFR | MULTISUB ) (?:\.|_|\b)'
             from: title
-    # generate RSS feeds to send daily mail
-    make_rss:
-      file: /home/manu/.flexget/downloads.rss
-      days: 1
+    # Push notification on Mobile
+    pushbullet:
+      apikey: '{{ secrets.pushbullet.apikey }}'
+      #device: '{{ secrets.pushbullet.device }}'
+      title: "{{imdb_name}} {{imdb_year}} ({{imdb_score}})"
+      body: "{{imdb_name}} {{imdb_year}} ({{imdb_score}})\n{{ imdb_genres|join(', ') }}\n\n{{quality}} - {{content_size}}MB\n\n{{imdb_url}}"
+    # generate RSS feed to send daily mail
+    #make_rss:
+    #  file: '{{ secrets.rss.file }}'
+    #  days: 1
 
   movies_discover:
-    interval: 1 hour
-    set:
-      label: movies-discover
     if:
-      - 'imdb_year < now.year - 2': reject
+      - 'imdb_year < now.year - 3': reject
       - "'horror' in (imdb_genres or [])": reject
       - "'musical' in (imdb_genres or [])": reject
       - "'documentary' in (imdb_genres or [])": reject
@@ -139,40 +123,47 @@ templates:
       - "'french' == (imdb_languages or ['french'])[0]":
           set:
             content_filename: "{{ imdb_name|replace('/', '_')|replace(':', ' -') }} ({{ imdb_year }}) - {{ quality }}"
-            movedone: "/home/manu/Downloads/MOVIES/VF/"
+            movedone: '{{ secrets.movies.pathVF }}'
           imdb:
             min_score: 6.5
-            min_votes: 200
+            min_votes: 150
       - "'french' != (imdb_languages or ['french'])[0]":
           set:
             content_filename: "{{ imdb_name|replace('/', '_')|replace(':', ' -') }} ({{ imdb_year }}) - {{ quality }}"
-            movedone: "/home/manu/Downloads/MOVIES/VO/"
+            movedone: '{{ secrets.movies.pathVO }}'
           imdb:
             min_score: 7
-            min_votes: 400
-            accept_languages: [english, danish, dutch, spanish, german, italian, norwegian, japanese ]
+            min_votes: 300
       # Restrictions Notes on specific genres
       - "set(['drama', 'romance']).issubset(set(imdb_genres or []))":
           imdb:
             min_score: 7.5
-            min_votes: 600
+            min_votes: 400
       - "set(['drama', 'war']).issubset(set(imdb_genres or []))":
           imdb:
             min_score: 7.5
-            min_votes: 600
+            min_votes: 400
       - "set(['animation', 'family']).issubset(set(imdb_genres or []))":
           imdb:
             min_score: 7.5
-            min_votes: 600
+            min_votes: 400
 
   movies_watchlist:
-    set:
-      label: movies-watchlist
     movie_queue: yes
+    
+  cpasbien_config:
+    include:
+      - private/input-movies-cpasbien.yml
+    urlrewrite:
+      CPASBIENRSS:
+        regexp: 'http://www.cpasbien.pe/dl-torrent/films/(?P<abc>[0-9a-z-]+)/(?P<name>[0-9a-z-]+).html'
+        format: 'http://www.cpasbien.pe/_torrents/\g<name>.torrent'
                 
 tasks:
   
+  # Specific Task to download monthly newspaper
   PressTorrent:
+    priority: 15
     include:
       - private/config-t411.yml
       - private/input-press.yml
@@ -183,14 +174,16 @@ tasks:
       - torrent_alive
     accept_all: yes
     exists:
-      - "/home/manu/Dropbox/Presse"
+      - '{{ secrets.press.exists }}'
     set:
-      movedone: "/home/manu/Dropbox/Presse"
+      movedone: '{{ secrets.press.path }}'
 
+  # Search torrent on Dropbox specific synchronised directory
   DropboxTorrent:
-    priority: 1
+    priority: 2
     disable_builtins: yes
     disable_plugin:
+      - seen_movies
       - inputs
       - regexp
       - content_size
@@ -198,7 +191,7 @@ tasks:
     plugin_priority:
       exec: 0
     find:
-      path: '/home/manu/Dropbox/torrents'
+      path: '{{ secrets.dropbox.pathTorrent }}'
       regexp: '.*\.torrent$'
       recursive: yes
     no_entries_ok: yes
@@ -207,85 +200,70 @@ tasks:
         for_accepted: rm "{{location}}"
     accept_all: yes
     set:
-      movedone: "/home/manu/Downloads"
+      movedone: '{{ secrets.dropbox.path }}'
+    # Push notification on Mobile
+    pushbullet:
+      apikey: '{{ secrets.pushbullet.apikey }}'
+      device: '{{ secrets.pushbullet.device }}'
+      title: "Seedbox: {{title}} downloaded\n\n"
+      body: ""
 
   ###################
   # TV Shows
   ###################
 
   TV-SHOWS:
-    priority: 2
+    priority: 5
     include:
       - private/input-tvshows-rss.yml
-      #- private/config-transmission.yml
     template: tv
 
   TV-SHOWS_t411:
-    priority: 3
+    priority: 5
+    #only_new: yes
     include:
       - private/config-t411.yml
       - private/input-tvshows-t411.yml
-      #- private/config-transmission.yml
-    template: 
-      - tv
+    template: tv
 
   ###################
   # Movies WatchList
   ###################
  
-  queue_from_imdb_Manu:
-    priority: 4
-    include: [ private/input-watchlist-rss.yml ]
+  # Update IMDB watchlist
+  queue_from_imdb:
+    priority: 8
+    template: no_global # None of the global templates make sense here
+    imdb_list:
+      user_id: '{{ secrets.imdb.user_id }}'
+      list: watchlist
     accept_all: yes
     disable_plugin: [download, deluge, remember_rejected]
-    seen: local  # We don't want accepted movies on this feed to affect actual download feed
-    queue_movies:
-    template: 
-      - tv
-
-  ###################
-  # Movies WatchList
-  ###################
- 
-  queue_from_imdb_Manu:
-    priority: 4
-    include: [ private/input-watchlist-rss.yml ]
-    accept_all: yes
-    disable_plugin: [download, deluge, remember_rejected]
-    seen: local  # We don't want accepted movies on this feed to affect actual download feed
     queue_movies:
       quality: 720p+ hdtv+
 
   Movies_watchlist_t411:
-    priority: 5
+    priority: 10
+    #only_new: yes
     include: 
       - private/config-t411.yml
       - private/input-movies-t411.yml
-      #- private/config-transmission.yml
     template:
       - movies
       - movies_watchlist
 
   Movies_watchlist_cpasbien:
-    priority: 5
-    inputs:
-      - html:
-          url: "http://www.cpasbien.pe/view_cat.php?categorie=films"
-          links_re:
-            - 'http://www.cpasbien.pe/dl-torrent/films/(?P<abc>[0-9a-z-]+)/(?P<name>[0-9a-z-]+).html'
-    urlrewrite:
-      CPASBIENRSS:
-        regexp: 'http://www.cpasbien.pe/dl-torrent/films/(?P<abc>[0-9a-z-]+)/(?P<name>[0-9a-z-]+).html'
-        format: 'http://www.cpasbien.pe/_torrents/\g<name>.torrent'
+    priority: 10
+    #only_new: yes
     template:
       - movies
       - movies_watchlist
+      - cpasbien_config
 
   Movies_watchlist:
-    priority: 6
+    priority: 10
     include:
       - private/input-movies-rss.yml
-      #- private/config-transmission.yml
     template:
       - movies
       - movies_watchlist
@@ -295,35 +273,27 @@ tasks:
   ###################
 
   Movies_discover_t411:
-    priority: 7
+    priority: 15
+    #only_new: yes
     include:
       - private/config-t411.yml
       - private/input-movies-t411.yml
-      #- private/config-transmission.yml 
     template:
       - movies
       - movies_discover
 
   Movies_discover_cpasbien:
-    priority: 5
-    inputs:
-      - html:
-          url: "http://www.cpasbien.pe/view_cat.php?categorie=films"
-          links_re:
-            - 'http://www.cpasbien.pe/dl-torrent/films/(?P<abc>[0-9a-z-]+)/(?P<name>[0-9a-z-]+).html'
-    urlrewrite:
-      CPASBIENRSS:
-        regexp: 'http://www.cpasbien.pe/dl-torrent/films/(?P<abc>[0-9a-z-]+)/(?P<name>[0-9a-z-]+).html'
-        format: 'http://www.cpasbien.pe/_torrents/\g<name>.torrent'
+    priority: 15
+    #only_new: yes
     template:
       - movies
       - movies_discover
+      - cpasbien_config
 
   Movies_discover:
-    priority: 8
+    priority: 15
     include:
       - private/input-movies-rss.yml
-      #- private/config-transmission.yml
     template:
       - movies
       - movies_discover
@@ -333,12 +303,12 @@ tasks:
   ###################
 
   Subtitles:
-    priority: 10
-    interval: 2 hours
+    template: no_global # None of the global templates make sense here
+    priority: 20
     find:
       path: 
-        - /home/manu/Downloads/TV-SHOWS/
-        - /home/manu/Downloads/MOVIES/VO/
+        - '{{ secrets.subtitles.path1 }}'
+        - '{{ secrets.subtitles.path2 }}'
       recursive: yes
     accept_all: yes
     seen: local
@@ -360,9 +330,10 @@ tasks:
   ###################
 
   emailfeed:
-    priority: 15
+    priority: 25
+    template: no_global # None of the global templates make sense here
     rss:
-      url: /home/manu/.flexget/downloads.rss
+      url: '{{ secrets.rss.file }}'
     disable_builtins: [seen, retry_failed]
     disable_plugin: [deluge]
     metainfo_series: yes # required for tvdb lookup to work, email template to function correctly
@@ -370,16 +341,17 @@ tasks:
     imdb_lookup: yes
     tmdb_lookup: yes
     accept_all: yes
-    include: [ private/config-email.yml ]
+    email:
+      from: '{{ secrets.email.from }}'
+      to: '{{ secrets.email.to }}'
+      smtp_host: '{{ secrets.email.smtp_host }}'
+      smtp_port: 587
+      smtp_username: '{{ secrets.email.smtp_username }}'
+      smtp_password: '{{ secrets.email.smtp_password }}'
+      smtp_tls: yes
+      subject: '{{ secrets.email.subject }}'
+      template: '{{ secrets.email.template }}'
       
-
-  ###################
-  # TRANSMISSION CLEANUP
-  ###################
-
-  #Cleanup:
-  #  priority: 20
-  #  include: [ private/config-clean-transmission.yml ]
 
 schedules:
     
@@ -400,20 +372,27 @@ schedules:
   #
   # IMDB List & Subtitles
   #
-  - tasks: [queue_from_imdb_Manu, Subtitles]
+  - tasks: [queue_from_imdb, Subtitles]
     interval:
-      hours: 2
+      hours: 3
       
   #
   # Tv Shows
   #
-  - tasks: [TV-SHOWS, TV-SHOWS_t411]
+  - tasks: [TV-SHOWS]
     interval:
-      hours: 1
+      hours: 2
 
   #
-  # Movies
+  # Movies Watchlist
   #
-  - tasks: [Movies_watchlist_t411, Movies_watchlist, Movies_discover_t411, Movies_discover]
+  - tasks: [Movies_watchlist_t411, Movies_watchlist, Movies_watchlist_cpasbien]
     interval:
-      minutes: 30
+      hours: 2
+
+  #
+  # Movies Discover
+  #
+  - tasks: [Movies_discover_t411, Movies_discover, Movies_discover_cpasbien]
+    interval:
+      hours: 3

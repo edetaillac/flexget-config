@@ -1,6 +1,24 @@
-Best:  
-  - The Big Bang Theory:
-      alternate_name: Big Bang Theory
-  - Game of Thrones
-  - True Detective
-  - Helix 
+series:
+  settings:
+    Default: &DEFAULT_SETTING
+      timeframe: 6 hours
+      propers: 12 hours 
+    Best:
+      <<: *DEFAULT_SETTING
+      quality: 720p
+    Good:
+      <<: *DEFAULT_SETTING
+      quality: hdtv
+  Best:  
+    - The Big Bang Theory:
+        alternate_name: Big Bang Theory
+    - Game of Thrones
+    - True Detective
+    - Helix
+    - Homeland
+    - Sherlock
+    - Better Call Saul
+    - vikings:
+        begin: S03E01
+    - Broadchurch:
+        begin: S02E01

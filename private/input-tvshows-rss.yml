@@ -1,6 +1,5 @@
 inputs:
-  - rss: { url: 'http://torrentz.eu/feed_verified?q=tv', silent: yes }
-  - rss: { url: 'http://torrentz.me/feed_verified?q=tv', silent: yes }
+  #- rss: { url: 'http://torrentz.me/feed_verified?q=tv', silent: yes }
   - rss: { url: 'http://www.torlock.com/television/rss.xml', silent: yes }
   - rss: { url: 'http://rss.bt-chat.com/?group=3', silent: yes }
   - rss: { url: 'http://ezrss.it/feed/', silent: yes }
