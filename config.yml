@@ -7,14 +7,23 @@ templates:
       space: 10000
     # Require at least 30 seeds of any torrent
     torrent_alive:
-      min_seeds: 10
+      min_seeds: 15
       reject_for: 2 hours
     verify_ssl_certificates: no
-    deluge:
+    #deluge:
+    #  main_file_only: yes
+    #  path: '{{ secrets.deluge.path }}'
+    #  ratio: 6
+    #  removeatratio: yesi
+    transmission:
+      host: localhost
+      port: 8072
+      username: '{{ secrets.transmission.username }}'
+      password: '{{ secrets.transmission.password }}'
+      include_subs: yes
       main_file_only: yes
-      path: '{{ secrets.deluge.path }}'
       ratio: 6
-      removeatratio: yes
+      path: '{{ secrets.transmission.path }}'   
     # Size and seed restrictions require real torrents
     magnets: no
     # Limit the frequency of requests to domains so they don't complain about
@@ -25,23 +34,22 @@ templates:
       torrentz.eu: 10 seconds
       bt-chat.com-tv: 5 seconds
       bt-chat.com: 5 seconds
-      ezrss.it: 2 seconds
-      showrss.info-tv: 2 seconds
-      t411.me: 2 seconds
-      thepiratebay.se: 2 seconds
-      kickass.to: 2 seconds
-      publichd.eu: 2 seconds
-      yify-torrents.com: 2 seconds
+      ezrss.it: 5 seconds
+      showrss.info-tv: 5 seconds
+      t411.me: 5 seconds
+      thepiratebay.se: 5 seconds
+      kickass.to: 5 seconds
+      publichd.eu: 5 seconds
+      yify-torrents.com: 5 seconds
   
   tv:
     private_torrents: no
     tmdb_lookup: yes
     include:
       - private/series.yml
-    deluge:
+    transmission:
       content_filename: "{{series_name}} - {{series_id}} - {{quality}}"
-      movedone: '{{secrets.deluge.series_movedone}}'
-      label: tv-shows
+      path: '{{secrets.transmission.series_movedone}}'
     # Push notification Mobile
     pushbullet:
       apikey: '{{ secrets.pushbullet.apikey }}'
@@ -55,7 +63,7 @@ templates:
 
   movies:
     quality: 720p+ hdtv+
-    content_size: { min: 1000, max: 7000 }
+    content_size: { min: 1000, max: 10000 }
     regexp:
       reject:
         # Avoid certain groups.
@@ -77,36 +85,55 @@ templates:
         - \.rar|\.r\d\d|password.txt|\.zip
       from: title
     seen_movies: strict # Don't download movies we've already seen
+
     # Check for already downloaded manually movies
     exists_movie:
-      - '{{ secrets.download.defaultPath }}'
-      - '{{ secrets.movies.pathVF }}'
-      - '{{ secrets.movies.pathVO }}'
-    imdb_lookup: yes
+      path:
+        - '{{ secrets.download.defaultPath }}'
+        - '{{ secrets.movies.pathVF }}'
+        - '{{ secrets.movies.pathVO }}'
+      type: files
+      lookup: imdb
+  
     imdb_required: yes
+    imdb_lookup: yes
+
+    # Filter to accept entries
+    movie_queue: accept
+
     if:
       - "'french' == (imdb_languages or ['french'])[0]":
           set:
             content_filename: "{{ imdb_name|replace('/', '_')|replace(':', ' -') }} ({{ imdb_year }}) - {{ quality }}"
-            movedone: '{{ secrets.movies.pathVF }}'
+            path: '{{ secrets.movies.pathVF }}'
       - "'french' != (imdb_languages or ['french'])[0]":
           set:
             content_filename: "{{ imdb_name|replace('/', '_')|replace(':', ' -') }} ({{ imdb_year }}) - {{ quality }}"
-            movedone: '{{ secrets.movies.pathVO }}'
+            path: '{{ secrets.movies.pathVO }}'
           regexp:
             reject:
               # don't download French movies (only VO)
               - '(?x) [\W_] (?: truefrench | fr | french | VFF | VFQ ) (?:\.|_|\b)':
                   not:
                     # Accept VOSTFR/MultiSub
-                    - '(?x) [\W_] (?: VOSTFR | MULTISUB ) (?:\.|_|\b)'
+                    - '(?x) [\W_] (?: VOSTFR | MULTISUB | MULTI ) (?:\.|_|\b)'
             from: title
+    # Don't download movies already rated    
+    crossmatch:
+      from:
+        - imdb_list:
+            list: ratings
+            user_id: '{{ secrets.imdb.user_id }}'
+      fields:
+        - imdb_id
+      action: reject
     # Push notification on Mobile
     pushbullet:
       apikey: '{{ secrets.pushbullet.apikey }}'
       #device: '{{ secrets.pushbullet.device }}'
       title: "{{imdb_name}} {{imdb_year}} ({{imdb_score}})"
-      body: "{{imdb_name}} {{imdb_year}} ({{imdb_score}})\n{{ imdb_genres|join(', ') }}\n\n{{quality}} - {{content_size}}MB\n\n{{imdb_url}}"
+      body: "{{imdb_name}} {{imdb_year}} ({{imdb_score}})\n{{ imdb_genres|join(', ') }}\n\n{{quality}} - {{content_size}}MB"
+      url: "{% if imdb_url %}{{ imdb_url }}{% endif %}"
     # generate RSS feed to send daily mail
     #make_rss:
     #  file: '{{ secrets.rss.file }}'
@@ -123,33 +150,34 @@ templates:
       - "'french' == (imdb_languages or ['french'])[0]":
           set:
             content_filename: "{{ imdb_name|replace('/', '_')|replace(':', ' -') }} ({{ imdb_year }}) - {{ quality }}"
-            movedone: '{{ secrets.movies.pathVF }}'
+            path: '{{ secrets.movies.pathVF }}'
           imdb:
             min_score: 6.5
             min_votes: 150
       - "'french' != (imdb_languages or ['french'])[0]":
           set:
             content_filename: "{{ imdb_name|replace('/', '_')|replace(':', ' -') }} ({{ imdb_year }}) - {{ quality }}"
-            movedone: '{{ secrets.movies.pathVO }}'
+            path: '{{ secrets.movies.pathVO }}'
           imdb:
-            min_score: 7
+            min_score: 7.3
             min_votes: 300
       # Restrictions Notes on specific genres
-      - "set(['drama', 'romance']).issubset(set(imdb_genres or []))":
+      - "'drama' in (imdb_genres or [])":
           imdb:
-            min_score: 7.5
+            min_score: 7.7
             min_votes: 400
-      - "set(['drama', 'war']).issubset(set(imdb_genres or []))":
+      - "'war' in (imdb_genres or [])":
           imdb:
-            min_score: 7.5
+            min_score: 7.7
+            min_votes: 400
+      - "'romance' in (imdb_genres or [])":
+          imdb:
+            min_score: 7.7
             min_votes: 400
       - "set(['animation', 'family']).issubset(set(imdb_genres or []))":
           imdb:
-            min_score: 7.5
+            min_score: 7.7
             min_votes: 400
-
-  movies_watchlist:
-    movie_queue: yes
     
   cpasbien_config:
     include:
@@ -167,7 +195,7 @@ tasks:
     include:
       - private/config-t411.yml
       - private/input-press.yml
-    disable_plugin: 
+    disable: 
       - inputs
       - regexp
       - content_size
@@ -176,13 +204,13 @@ tasks:
     exists:
       - '{{ secrets.press.exists }}'
     set:
-      movedone: '{{ secrets.press.path }}'
+      path: '{{ secrets.press.path }}'
 
   # Search torrent on Dropbox specific synchronised directory
   DropboxTorrent:
     priority: 2
-    disable_builtins: yes
-    disable_plugin:
+    disable: yes
+    disable:
       - seen_movies
       - inputs
       - regexp
@@ -200,7 +228,7 @@ tasks:
         for_accepted: rm "{{location}}"
     accept_all: yes
     set:
-      movedone: '{{ secrets.dropbox.path }}'
+      path: '{{ secrets.dropbox.path }}'
     # Push notification on Mobile
     pushbullet:
       apikey: '{{ secrets.pushbullet.apikey }}'
@@ -238,27 +266,45 @@ tasks:
       user_id: '{{ secrets.imdb.user_id }}'
       list: watchlist
     accept_all: yes
-    disable_plugin: [download, deluge, remember_rejected]
-    queue_movies:
+    disable:
+      - download
+      - transmission
+      - remember_rejected
+      - seen
+    movie_queue:
+      action: add
       quality: 720p+ hdtv+
 
   Movies_watchlist_t411:
     priority: 10
-    #only_new: yes
     include: 
       - private/config-t411.yml
       - private/input-movies-t411.yml
     template:
       - movies
-      - movies_watchlist
 
-  Movies_watchlist_cpasbien:
+  Movies_watchlist_discover:
     priority: 10
-    #only_new: yes
+    discover:
+      what:
+        - emit_movie_queue: { year: no } 
+      from:
+        - cpasbien:
+            category: "films"
+        - torrent411: 
+            username: '{{ secrets.t411.username }}'
+            password: '{{ secrets.t411.password }}'
+            category: Film
+            sub_category:
+              - HDrip-720p
+              - HDrip-1080p
+        - kat:
+            category: movies
+            verified: yes
+        #- torrentz: verified
+      ignore_estimations: yes
     template:
       - movies
-      - movies_watchlist
-      - cpasbien_config
 
   Movies_watchlist:
     priority: 10
@@ -266,7 +312,13 @@ tasks:
       - private/input-movies-rss.yml
     template:
       - movies
-      - movies_watchlist
+
+  Movies_watchlist_lbta:
+    priority: 10
+    include:
+      - private/input-movies-lbta.yml
+    template:
+      - movies
 
   ###################
   # Movies Discover
@@ -298,6 +350,14 @@ tasks:
       - movies
       - movies_discover
 
+  Movies_discover_lbta:
+    priority: 15
+    include:
+      - private/input-movies-lbta.yml
+    template:
+      - movies
+      - movies_discover
+
   ###################
   # Subtitles
   ###################
@@ -312,8 +372,10 @@ tasks:
       recursive: yes
     accept_all: yes
     seen: local
-    disable_builtins: [seen, retry_failed]
-    disable_plugin: [deluge]
+    disable:
+      - transmission
+      - seen
+      - retry_failed
     regexp: 
       reject_excluding:
         - '.*\.(avi|mkv|mp4)$':
@@ -334,8 +396,10 @@ tasks:
     template: no_global # None of the global templates make sense here
     rss:
       url: '{{ secrets.rss.file }}'
-    disable_builtins: [seen, retry_failed]
-    disable_plugin: [deluge]
+    disable:
+      - transmission
+      - seen        
+      - retry_failed
     metainfo_series: yes # required for tvdb lookup to work, email template to function correctly
     thetvdb_lookup: yes
     imdb_lookup: yes
@@ -351,6 +415,11 @@ tasks:
       smtp_tls: yes
       subject: '{{ secrets.email.subject }}'
       template: '{{ secrets.email.template }}'
+  
+  stopSeeding:
+    clean_transmission:
+      min_ratio: 6
+    template: no_global
       
 
 schedules:
@@ -365,34 +434,34 @@ schedules:
   #
   # Notifications
   #
-  - tasks: [emailfeed, PressTorrent]
-    interval:
-      days: 1
+  #- tasks: [emailfeed]
+  #  interval:
+  #   days: 1
 
   #
-  # IMDB List & Subtitles
+  # IMDB List & cleanTransmission
   #
-  - tasks: [queue_from_imdb, Subtitles]
+  - tasks: [queue_from_imdb, stopSeeding]
     interval:
-      hours: 3
+      hours: 4
       
   #
   # Tv Shows
   #
   - tasks: [TV-SHOWS]
     interval:
-      hours: 2
+      hours: 4
 
   #
   # Movies Watchlist
   #
-  - tasks: [Movies_watchlist_t411, Movies_watchlist, Movies_watchlist_cpasbien]
+  - tasks: [Movies_watchlist_discover, Movies_watchlist_lbta]
     interval:
-      hours: 2
+      hours: 6
 
   #
   # Movies Discover
   #
-  - tasks: [Movies_discover_t411, Movies_discover, Movies_discover_cpasbien]
+  - tasks: [Movies_discover_t411, Movies_discover]
     interval:
-      hours: 3
+      hours: 6
