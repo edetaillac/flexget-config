@@ -29,7 +29,7 @@ templates:
     # Limit the frequency of requests to domains so they don't complain about
     # using a bot
     headers:
-      User-Agent: "Mozilla/5.0 (Windows NT 6.1; rv:13.0) Gecko/20100101 Firefox/13.0.1"
+      User-Agent: "Mozilla/5.0 (Windows NT 5.1; rv:16.0) Gecko/20100101 Firefox/16.0"
     domain_delay:
       torrentz.eu: 10 seconds
       bt-chat.com-tv: 5 seconds
@@ -38,7 +38,7 @@ templates:
       showrss.info-tv: 5 seconds
       t411.me: 5 seconds
       thepiratebay.se: 5 seconds
-      kickass.to: 5 seconds
+      kickass.to: 10 seconds
       publichd.eu: 5 seconds
       yify-torrents.com: 5 seconds
   
@@ -110,14 +110,6 @@ templates:
           set:
             content_filename: "{{ imdb_name|replace('/', '_')|replace(':', ' -') }} ({{ imdb_year }}) - {{ quality }}"
             path: '{{ secrets.movies.pathVO }}'
-          regexp:
-            reject:
-              # don't download French movies (only VO)
-              - '(?x) [\W_] (?: truefrench | fr | french | VFF | VFQ ) (?:\.|_|\b)':
-                  not:
-                    # Accept VOSTFR/MultiSub
-                    - '(?x) [\W_] (?: VOSTFR | MULTISUB | MULTI ) (?:\.|_|\b)'
-            from: title
     # Don't download movies already rated    
     crossmatch:
       from:
@@ -132,14 +124,32 @@ templates:
       apikey: '{{ secrets.pushbullet.apikey }}'
       #device: '{{ secrets.pushbullet.device }}'
       title: "{{imdb_name}} {{imdb_year}} ({{imdb_score}})"
-      body: "{{imdb_name}} {{imdb_year}} ({{imdb_score}})\n{{ imdb_genres|join(', ') }}\n\n{{quality}} - {{content_size}}MB"
+      body: "Genres: {{ imdb_genres|join(', ') }}\n\nTitle: {{title}}\nQuality: {{quality}}\nSize: {{content_size}}MB\n\nDownloaded by: {{task}}"
       url: "{% if imdb_url %}{{ imdb_url }}{% endif %}"
     # generate RSS feed to send daily mail
     #make_rss:
     #  file: '{{ secrets.rss.file }}'
     #  days: 1
 
+  movies_watchlist:
+    if:
+      - "'french' != (imdb_languages or ['french'])[0]":
+          regexp:
+            reject_excluding:
+              # Only accept VOSTFR or Multi sub
+              - '(?x) [\W_] (?: VOSTFR | MULTISUB | MULTI ) (?:\.|_|\b)'
+            from: title
+
   movies_discover:
+     # Don't download movies in watchlist
+    crossmatch:
+      from:
+        - imdb_list:
+            list: watchlist
+            user_id: '{{ secrets.imdb.user_id }}'
+      fields:
+        - imdb_id
+      action: reject
     if:
       - 'imdb_year < now.year - 3': reject
       - "'horror' in (imdb_genres or [])": reject
@@ -148,16 +158,18 @@ templates:
       # Probably a standup comedy.
       - "'comedy' in (imdb_genres or []) and 1 == len(imdb_actors or [])": reject
       - "'french' == (imdb_languages or ['french'])[0]":
-          set:
-            content_filename: "{{ imdb_name|replace('/', '_')|replace(':', ' -') }} ({{ imdb_year }}) - {{ quality }}"
-            path: '{{ secrets.movies.pathVF }}'
           imdb:
             min_score: 6.5
             min_votes: 150
       - "'french' != (imdb_languages or ['french'])[0]":
-          set:
-            content_filename: "{{ imdb_name|replace('/', '_')|replace(':', ' -') }} ({{ imdb_year }}) - {{ quality }}"
-            path: '{{ secrets.movies.pathVO }}'
+          regexp:
+            reject:
+              # don't download French movies (only VO)
+              - '(?x) [\W_] (?: truefrench | fr | french | VFF | VFQ ) (?:\.|_|\b)':
+                  not:
+                    # Accept VOSTFR/MultiSub
+                    - '(?x) [\W_] (?: VOSTFR | MULTISUB | MULTI ) (?:\.|_|\b)'
+            from: title
           imdb:
             min_score: 7.3
             min_votes: 300
@@ -265,12 +277,16 @@ tasks:
     imdb_list:
       user_id: '{{ secrets.imdb.user_id }}'
       list: watchlist
+    seen: local
+    retry_failed:
+      max_retries: 10
     accept_all: yes
+    no_entries_ok: yes
     disable:
       - download
       - transmission
       - remember_rejected
-      - seen
+      - retry_failed
     movie_queue:
       action: add
       quality: 720p+ hdtv+
@@ -282,6 +298,7 @@ tasks:
       - private/input-movies-t411.yml
     template:
       - movies
+      - movies_watchlist
 
   Movies_watchlist_discover:
     priority: 10
@@ -305,6 +322,7 @@ tasks:
       ignore_estimations: yes
     template:
       - movies
+      - movies_watchlist
 
   Movies_watchlist:
     priority: 10
@@ -312,6 +330,7 @@ tasks:
       - private/input-movies-rss.yml
     template:
       - movies
+      - movies_watchlist
 
   Movies_watchlist_lbta:
     priority: 10
@@ -319,6 +338,7 @@ tasks:
       - private/input-movies-lbta.yml
     template:
       - movies
+      - movies_watchlist
 
   ###################
   # Movies Discover
@@ -368,13 +388,12 @@ tasks:
     find:
       path: 
         - '{{ secrets.subtitles.path1 }}'
-        - '{{ secrets.subtitles.path2 }}'
+        #- '{{ secrets.subtitles.path2 }}'
       recursive: yes
     accept_all: yes
     seen: local
     disable:
       - transmission
-      - seen
       - retry_failed
     regexp: 
       reject_excluding:
@@ -385,7 +404,7 @@ tasks:
     subliminal:
       languages:
         - fra
-      exact_match: no
+      exact_match: yes
 
   ###################
   # EMAILS NOTIFICATIONS
@@ -418,8 +437,13 @@ tasks:
   
   stopSeeding:
     clean_transmission:
+      port: 8072
+      host: localhost
+      username: '{{ secrets.transmission.username }}'
+      password: '{{ secrets.transmission.password }}'
       min_ratio: 6
     template: no_global
+    disable: [details]
       
 
 schedules:
@@ -437,6 +461,13 @@ schedules:
   #- tasks: [emailfeed]
   #  interval:
   #   days: 1
+
+  #
+  # Subtitles
+  #
+  - tasks: [Subtitles]
+    interval:
+      hours: 1
 
   #
   # IMDB List & cleanTransmission
