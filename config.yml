@@ -36,9 +36,9 @@ templates:
       bt-chat.com: 5 seconds
       ezrss.it: 5 seconds
       showrss.info-tv: 5 seconds
-      t411.me: 5 seconds
+      t411.io: 5 seconds
       thepiratebay.se: 5 seconds
-      kickass.to: 10 seconds
+      kat.cr: 10 seconds
       publichd.eu: 5 seconds
       yify-torrents.com: 5 seconds
   
@@ -60,6 +60,18 @@ templates:
     #make_rss:
     #  file: '{{ secrets.rss.file }}'
     #  days: 1
+
+  imdb_watchlist:
+    seen: local
+    retry_failed:
+      max_retries: 10
+    accept_all: yes
+    no_entries_ok: yes
+    disable:
+      - download
+      - transmission
+      - remember_rejected
+      - retry_failed
 
   movies:
     quality: 720p+ hdtv+
@@ -171,20 +183,20 @@ templates:
                     - '(?x) [\W_] (?: VOSTFR | MULTISUB | MULTI ) (?:\.|_|\b)'
             from: title
           imdb:
-            min_score: 7.3
+            min_score: 7.4
             min_votes: 300
       # Restrictions Notes on specific genres
       - "'drama' in (imdb_genres or [])":
           imdb:
-            min_score: 7.7
+            min_score: 7.6
             min_votes: 400
       - "'war' in (imdb_genres or [])":
           imdb:
-            min_score: 7.7
+            min_score: 7.6
             min_votes: 400
       - "'romance' in (imdb_genres or [])":
           imdb:
-            min_score: 7.7
+            min_score: 7.6
             min_votes: 400
       - "set(['animation', 'family']).issubset(set(imdb_genres or []))":
           imdb:
@@ -252,18 +264,27 @@ tasks:
   # TV Shows
   ###################
 
-  TV-SHOWS:
+  TV-SHOWS_rss:
     priority: 5
     include:
       - private/input-tvshows-rss.yml
     template: tv
 
-  TV-SHOWS_t411:
+  TV-SHOWS_discover:
     priority: 5
-    #only_new: yes
-    include:
-      - private/config-t411.yml
-      - private/input-tvshows-t411.yml
+    discover:
+      what:
+        - emit_series: yes
+      from:
+        - torrent411: 
+            username: '{{ secrets.t411.username }}'
+            password: '{{ secrets.t411.password }}'
+            category: Serie-TV
+            sub_category:
+              - HDrip-720p
+        - kat:
+            category: tv
+            verified: yes
     template: tv
 
   ###################
@@ -273,23 +294,35 @@ tasks:
   # Update IMDB watchlist
   queue_from_imdb:
     priority: 8
-    template: no_global # None of the global templates make sense here
+    # Don't add movies in ratings list
+    crossmatch:
+      from:
+        - imdb_list:
+            list: ratings
+            user_id: '{{ secrets.imdb.user_id }}'
+      fields:
+        - imdb_id
+      action: reject
     imdb_list:
       user_id: '{{ secrets.imdb.user_id }}'
       list: watchlist
-    seen: local
-    retry_failed:
-      max_retries: 10
-    accept_all: yes
-    no_entries_ok: yes
-    disable:
-      - download
-      - transmission
-      - remember_rejected
-      - retry_failed
     movie_queue:
       action: add
       quality: 720p+ hdtv+
+    template: 
+      - no_global # None of the global templates make sense here
+      - imdb_watchlist
+
+  # Delete already rated movies from IMDB watchlist
+  delete_from_imdb:
+    priority: 8
+    imdb_list:
+      user_id: '{{ secrets.imdb.user_id }}'
+      list: ratings
+    movie_queue: remove
+    template: 
+      - no_global # None of the global templates make sense here
+      - imdb_watchlist
 
   Movies_watchlist_t411:
     priority: 10
@@ -470,16 +503,23 @@ schedules:
       hours: 1
 
   #
-  # IMDB List & cleanTransmission
+  # IMDB Watchlist update
   #
   - tasks: [queue_from_imdb, stopSeeding]
     interval:
       hours: 4
+
+  #
+  # IMDB Watchlist matching ratings List & cleanTransmission
+  #
+  - tasks: [delete_from_imdb, stopSeeding]
+    interval:
+      days: 1
       
   #
   # Tv Shows
   #
-  - tasks: [TV-SHOWS]
+  - tasks: [TV-SHOWS_rss, TV-SHOWS_discover]
     interval:
       hours: 4
 
