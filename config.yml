@@ -29,7 +29,7 @@ templates:
     # Limit the frequency of requests to domains so they don't complain about
     # using a bot
     headers:
-      User-Agent: "Mozilla/5.0 (Windows NT 5.1; rv:16.0) Gecko/20100101 Firefox/16.0"
+      User-Agent: "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/45.0.2454.85 Safari/537.36"
     domain_delay:
       torrentz.eu: 10 seconds
       bt-chat.com-tv: 5 seconds
@@ -242,9 +242,9 @@ tasks:
       - torrent_alive
     plugin_priority:
       exec: 0
-    find:
+    filesystem:
       path: '{{ secrets.dropbox.pathTorrent }}'
-      regexp: '.*\.torrent$'
+      mask: '*.torrent'
       recursive: yes
     no_entries_ok: yes
     exec:
@@ -256,7 +256,7 @@ tasks:
     # Push notification on Mobile
     pushbullet:
       apikey: '{{ secrets.pushbullet.apikey }}'
-      device: '{{ secrets.pushbullet.device }}'
+      #device: '{{ secrets.pushbullet.device }}'
       title: "Seedbox: {{title}} downloaded\n\n"
       body: ""
 
@@ -312,6 +312,8 @@ tasks:
     template: 
       - no_global # None of the global templates make sense here
       - imdb_watchlist
+    disable:
+      - seen
 
   # Delete already rated movies from IMDB watchlist
   delete_from_imdb:
@@ -418,21 +420,21 @@ tasks:
   Subtitles:
     template: no_global # None of the global templates make sense here
     priority: 20
-    find:
+    filesystem:
       path: 
         - '{{ secrets.subtitles.path1 }}'
         #- '{{ secrets.subtitles.path2 }}'
       recursive: yes
+      retrieve: files
+      regexp: '.*\.(avi|mkv|mp4)$'
     accept_all: yes
     seen: local
     disable:
       - transmission
       - retry_failed
     regexp: 
-      reject_excluding:
-        - '.*\.(avi|mkv|mp4)$':
-            not:
-              - '(?x) [\W_] (?: VOSTFR | Multi | Multisub | sample ) (?:\.|_|\b)'
+      reject:
+        - '(?x) [\W_] (?: french | VOSTFR | Multi | Multisub | sample ) (?:\.|_|\b)'
       from: url
     subliminal:
       languages:
