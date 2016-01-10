@@ -5,7 +5,7 @@ templates:
     free_space:
       path: '{{secrets.download.defaultPath}}'
       space: 10000
-    # Require at least 30 seeds of any torrent
+    # Require at least 15 seeds of any torrent
     torrent_alive:
       min_seeds: 15
       reject_for: 2 hours
@@ -74,8 +74,8 @@ templates:
       - retry_failed
 
   movies:
-    quality: 720p+ hdtv+
-    content_size: { min: 1000, max: 10000 }
+    quality: 720p+
+    content_size: { min: 1000, max: 15000 }
     regexp:
       reject:
         # Avoid certain groups.
@@ -109,6 +109,14 @@ templates:
   
     imdb_required: yes
     imdb_lookup: yes
+
+    require_field:
+      - imdb_id
+      - imdb_name
+      - imdb_year
+      - imdb_url
+      - imdb_languages
+      - imdb_genres
 
     # Filter to accept entries
     movie_queue: accept
@@ -175,12 +183,9 @@ templates:
             min_votes: 150
       - "'french' != (imdb_languages or ['french'])[0]":
           regexp:
-            reject:
-              # don't download French movies (only VO)
-              - '(?x) [\W_] (?: truefrench | fr | french | VFF | VFQ ) (?:\.|_|\b)':
-                  not:
-                    # Accept VOSTFR/MultiSub
-                    - '(?x) [\W_] (?: VOSTFR | MULTISUB | MULTI ) (?:\.|_|\b)'
+            reject_excluding:
+              # Accept VOSTFR/MultiSub
+              - '(?x) [\W_] (?: VOSTF | VOSTFR | MULTISUB | MULTI ) (?:\.|_|\b)'
             from: title
           imdb:
             min_score: 7.4
@@ -246,6 +251,7 @@ tasks:
       path: '{{ secrets.dropbox.pathTorrent }}'
       mask: '*.torrent'
       recursive: yes
+      retrieve: files
     no_entries_ok: yes
     exec:
       on_output:
@@ -308,7 +314,7 @@ tasks:
       list: watchlist
     movie_queue:
       action: add
-      quality: 720p+ hdtv+
+      quality: 720p+
     template: 
       - no_global # None of the global templates make sense here
       - imdb_watchlist
@@ -337,6 +343,7 @@ tasks:
 
   Movies_watchlist_discover:
     priority: 10
+    verify_ssl_certificates:  no
     discover:
       what:
         - emit_movie_queue: { year: no } 
@@ -353,7 +360,8 @@ tasks:
         - kat:
             category: movies
             verified: yes
-        #- torrentz: verified
+        #- search_rss: http://kickass.unblocked.la/usearch/{{search_term}}%20category:movies%20verified:1/?rss=1
+        - torrentz: verified
       ignore_estimations: yes
     template:
       - movies
@@ -369,6 +377,9 @@ tasks:
 
   Movies_watchlist_lbta:
     priority: 10
+    # lbta is not concerned by min_seeds constraint
+    torrent_alive:
+      min_seeds: 1
     include:
       - private/input-movies-lbta.yml
     template:
@@ -528,9 +539,9 @@ schedules:
   #
   # Movies Watchlist
   #
-  - tasks: [Movies_watchlist_discover, Movies_watchlist_lbta]
+  - tasks: [Movies_watchlist_discover]
     interval:
-      hours: 6
+      hours: 4
 
   #
   # Movies Discover
