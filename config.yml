@@ -5,16 +5,20 @@ templates:
     free_space:
       path: '{{secrets.download.defaultPath}}'
       space: 10000
+
     # Require at least 15 seeds of any torrent
     torrent_alive:
       min_seeds: 15
       reject_for: 2 hours
+
     verify_ssl_certificates: no
+
     #deluge:
     #  main_file_only: yes
     #  path: '{{ secrets.deluge.path }}'
     #  ratio: 6
     #  removeatratio: yesi
+
     transmission:
       host: localhost
       port: 8072
@@ -23,9 +27,11 @@ templates:
       include_subs: yes
       main_file_only: yes
       ratio: 6
-      path: '{{ secrets.transmission.path }}'   
+      path: '{{ secrets.transmission.path }}'
+   
     # Size and seed restrictions require real torrents
     magnets: no
+
     # Limit the frequency of requests to domains so they don't complain about
     # using a bot
     headers:
@@ -36,7 +42,7 @@ templates:
       bt-chat.com: 5 seconds
       ezrss.it: 5 seconds
       showrss.info-tv: 5 seconds
-      t411.io: 5 seconds
+      t411.ch: 5 seconds
       thepiratebay.se: 5 seconds
       kat.cr: 10 seconds
       publichd.eu: 5 seconds
@@ -48,14 +54,16 @@ templates:
     include:
       - private/series.yml
     transmission:
-      content_filename: "{{series_name}} - {{series_id}} - {{quality}}"
+      #content_filename: "{{series_name}} - {{series_id}} - {{quality}}"
       path: '{{secrets.transmission.series_movedone}}'
+
     # Push notification Mobile
     pushbullet:
       apikey: '{{ secrets.pushbullet.apikey }}'
       #device: '{{ secrets.pushbullet.device }}'
       title: "{{series_name}} {{series_id}}"
       body: "{{series_name}} {{series_id}}\n\n{{title}}\n\nSize: {{content_size}}MB" 
+
     # generate RSS feed to send daily mail
     #make_rss:
     #  file: '{{ secrets.rss.file }}'
@@ -109,7 +117,6 @@ templates:
   
     imdb_required: yes
     imdb_lookup: yes
-
     require_field:
       - imdb_id
       - imdb_name
@@ -130,15 +137,18 @@ templates:
           set:
             content_filename: "{{ imdb_name|replace('/', '_')|replace(':', ' -') }} ({{ imdb_year }}) - {{ quality }}"
             path: '{{ secrets.movies.pathVO }}'
+
     # Don't download movies already rated    
     crossmatch:
       from:
         - imdb_list:
             list: ratings
-            user_id: '{{ secrets.imdb.user_id }}'
+            login: '{{ secrets.imdb.login }}'
+            password: '{{ secrets.imdb.password }}'
       fields:
         - imdb_id
       action: reject
+
     # Push notification on Mobile
     pushbullet:
       apikey: '{{ secrets.pushbullet.apikey }}'
@@ -146,12 +156,13 @@ templates:
       title: "{{imdb_name}} {{imdb_year}} ({{imdb_score}})"
       body: "Genres: {{ imdb_genres|join(', ') }}\n\nTitle: {{title}}\nQuality: {{quality}}\nSize: {{content_size}}MB\n\nDownloaded by: {{task}}"
       url: "{% if imdb_url %}{{ imdb_url }}{% endif %}"
+
     # generate RSS feed to send daily mail
     #make_rss:
     #  file: '{{ secrets.rss.file }}'
     #  days: 1
 
-  movies_watchlist:
+  subtitled_movies:
     if:
       - "'french' != (imdb_languages or ['french'])[0]":
           regexp:
@@ -166,10 +177,12 @@ templates:
       from:
         - imdb_list:
             list: watchlist
-            user_id: '{{ secrets.imdb.user_id }}'
+            login: '{{ secrets.imdb.login }}'
+            password: '{{ secrets.imdb.password }}'
       fields:
         - imdb_id
       action: reject
+
     if:
       - 'imdb_year < now.year - 3': reject
       - "'horror' in (imdb_genres or [])": reject
@@ -179,16 +192,11 @@ templates:
       - "'comedy' in (imdb_genres or []) and 1 == len(imdb_actors or [])": reject
       - "'french' == (imdb_languages or ['french'])[0]":
           imdb:
-            min_score: 6.5
+            min_score: 6
             min_votes: 150
       - "'french' != (imdb_languages or ['french'])[0]":
-          regexp:
-            reject_excluding:
-              # Accept VOSTFR/MultiSub
-              - '(?x) [\W_] (?: VOSTF | VOSTFR | MULTISUB | MULTI ) (?:\.|_|\b)'
-            from: title
           imdb:
-            min_score: 7.4
+            min_score: 7
             min_votes: 300
       # Restrictions Notes on specific genres
       - "'drama' in (imdb_genres or [])":
@@ -215,7 +223,14 @@ templates:
       CPASBIENRSS:
         regexp: 'http://www.cpasbien.pe/dl-torrent/films/(?P<abc>[0-9a-z-]+)/(?P<name>[0-9a-z-]+).html'
         format: 'http://www.cpasbien.pe/_torrents/\g<name>.torrent'
-                
+
+  xt_config:
+    manipulate:
+      - url:
+          replace:
+            regexp: '(details.php\?id=([0-9]+)&hit=1)'
+            format: 'download.php?torrent=\2&torrent_pass={{ secrets.xt.passkey }}'
+
 tasks:
   
   # Specific Task to download monthly newspaper
@@ -282,12 +297,11 @@ tasks:
       what:
         - emit_series: yes
       from:
-        - torrent411: 
-            username: '{{ secrets.t411.username }}'
-            password: '{{ secrets.t411.password }}'
-            category: Serie-TV
-            sub_category:
-              - HDrip-720p
+        - t411: 
+            category: Série TV 
+            terms:
+              - HDrip 720
+              - HDrip 1080
         - kat:
             category: tv
             verified: yes
@@ -305,12 +319,14 @@ tasks:
       from:
         - imdb_list:
             list: ratings
-            user_id: '{{ secrets.imdb.user_id }}'
+            login: '{{ secrets.imdb.login }}'
+            password: '{{ secrets.imdb.password }}'
       fields:
         - imdb_id
       action: reject
     imdb_list:
-      user_id: '{{ secrets.imdb.user_id }}'
+      login: '{{ secrets.imdb.login }}'
+      password: '{{ secrets.imdb.password }}'
       list: watchlist
     movie_queue:
       action: add
@@ -318,19 +334,20 @@ tasks:
     template: 
       - no_global # None of the global templates make sense here
       - imdb_watchlist
-    disable:
-      - seen
+    seen: local
 
   # Delete already rated movies from IMDB watchlist
   delete_from_imdb:
     priority: 8
     imdb_list:
-      user_id: '{{ secrets.imdb.user_id }}'
+      login: '{{ secrets.imdb.login }}'
+      password: '{{ secrets.imdb.password }}'
       list: ratings
     movie_queue: remove
     template: 
       - no_global # None of the global templates make sense here
       - imdb_watchlist
+    seen: local
 
   Movies_watchlist_t411:
     priority: 10
@@ -339,7 +356,7 @@ tasks:
       - private/input-movies-t411.yml
     template:
       - movies
-      - movies_watchlist
+      - subtitled_movies
 
   Movies_watchlist_discover:
     priority: 10
@@ -350,22 +367,19 @@ tasks:
       from:
         - cpasbien:
             category: "films"
-        - torrent411: 
-            username: '{{ secrets.t411.username }}'
-            password: '{{ secrets.t411.password }}'
+        - t411: 
             category: Film
-            sub_category:
-              - HDrip-720p
-              - HDrip-1080p
+            terms:
+              - HDrip 720
+              - HDrip 1080
         - kat:
             category: movies
             verified: yes
-        #- search_rss: http://kickass.unblocked.la/usearch/{{search_term}}%20category:movies%20verified:1/?rss=1
         - torrentz: verified
-      ignore_estimations: yes
+      release_estimations: ignore
     template:
       - movies
-      - movies_watchlist
+      - subtitled_movies
 
   Movies_watchlist:
     priority: 10
@@ -373,18 +387,18 @@ tasks:
       - private/input-movies-rss.yml
     template:
       - movies
-      - movies_watchlist
+      - subtitled_movies
 
-  Movies_watchlist_lbta:
+  Movies_watchlist_xt:
     priority: 10
-    # lbta is not concerned by min_seeds constraint
     torrent_alive:
       min_seeds: 1
     include:
-      - private/input-movies-lbta.yml
+      - private/input-movies-xt.yml
     template:
       - movies
-      - movies_watchlist
+      - subtitled_movies
+      - xt_config
 
   ###################
   # Movies Discover
@@ -399,6 +413,7 @@ tasks:
     template:
       - movies
       - movies_discover
+      - subtitled_movies
 
   Movies_discover_cpasbien:
     priority: 15
@@ -406,6 +421,7 @@ tasks:
     template:
       - movies
       - movies_discover
+      - subtitled_movies
       - cpasbien_config
 
   Movies_discover:
@@ -415,14 +431,17 @@ tasks:
     template:
       - movies
       - movies_discover
+      - subtitled_movies
 
-  Movies_discover_lbta:
+  Movies_discover_xt:
     priority: 15
     include:
-      - private/input-movies-lbta.yml
+      - private/input-movies-xt.yml
     template:
       - movies
       - movies_discover
+      - subtitled_movies
+      - xt_config
 
   ###################
   # Subtitles
@@ -445,7 +464,7 @@ tasks:
       - retry_failed
     regexp: 
       reject:
-        - '(?x) [\W_] (?: french | VOSTFR | Multi | Multisub | sample ) (?:\.|_|\b)'
+        - '(?x) [\W_] (?: french | VOSTFR | Multi | sample ) (?:\.|_|\b)'
       from: url
     subliminal:
       languages:
@@ -511,9 +530,9 @@ schedules:
   #
   # Subtitles
   #
-  - tasks: [Subtitles]
-    interval:
-      hours: 1
+  #- tasks: [Subtitles]
+  #  interval:
+  #    hours: 1
 
   #
   # IMDB Watchlist update
@@ -525,7 +544,7 @@ schedules:
   #
   # IMDB Watchlist matching ratings List & cleanTransmission
   #
-  - tasks: [delete_from_imdb, stopSeeding]
+  - tasks: [delete_from_imdb]
     interval:
       days: 1
       
@@ -539,13 +558,13 @@ schedules:
   #
   # Movies Watchlist
   #
-  - tasks: [Movies_watchlist_discover]
+  - tasks: [Movies_watchlist_discover, Movies_watchlist_xt]
     interval:
       hours: 4
 
   #
   # Movies Discover
   #
-  - tasks: [Movies_discover_t411, Movies_discover]
+  - tasks: [Movies_discover_t411, Movies_discover, Movies_discover_xt]
     interval:
       hours: 6
