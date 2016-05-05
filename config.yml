@@ -1,3 +1,8 @@
+web_server:
+  bind: 0.0.0.0
+  port: 3539
+api: yes
+webui: yes
 secrets: private/secretfile.yml
 templates:
   global:
@@ -7,9 +12,9 @@ templates:
       space: 10000
 
     # Require at least 15 seeds of any torrent
-    torrent_alive:
-      min_seeds: 15
-      reject_for: 2 hours
+    #torrent_alive:
+    #  min_seeds: 15
+    #  reject_for: 2 hours
 
     verify_ssl_certificates: no
 
@@ -126,7 +131,8 @@ templates:
       - imdb_genres
 
     # Filter to accept entries
-    movie_queue: accept
+    list_accept:
+      - movie_list: watchlist
 
     if:
       - "'french' == (imdb_languages or ['french'])[0]":
@@ -137,17 +143,6 @@ templates:
           set:
             content_filename: "{{ imdb_name|replace('/', '_')|replace(':', ' -') }} ({{ imdb_year }}) - {{ quality }}"
             path: '{{ secrets.movies.pathVO }}'
-
-    # Don't download movies already rated    
-    crossmatch:
-      from:
-        - imdb_list:
-            list: ratings
-            login: '{{ secrets.imdb.login }}'
-            password: '{{ secrets.imdb.password }}'
-      fields:
-        - imdb_id
-      action: reject
 
     # Push notification on Mobile
     pushbullet:
@@ -225,6 +220,8 @@ templates:
         format: 'http://www.cpasbien.pe/_torrents/\g<name>.torrent'
 
   xt_config:
+    disable: 
+      - torrent_alive
     manipulate:
       - url:
           replace:
@@ -298,14 +295,25 @@ tasks:
         - emit_series: yes
       from:
         - t411: 
-            category: Série TV 
+            category: Série TV
             terms:
               - HDrip 720
               - HDrip 1080
         - kat:
             category: tv
             verified: yes
-    template: tv
+    template:
+      - tv
+      - subtitled_movies
+
+  TV-SHOWS_xt:
+    priority: 10
+    include:
+      - private/input-tvshows-xt.yml
+    template:
+      - tv
+      - subtitled_movies
+      - xt_config
 
   ###################
   # Movies WatchList
@@ -314,40 +322,26 @@ tasks:
   # Update IMDB watchlist
   queue_from_imdb:
     priority: 8
-    # Don't add movies in ratings list
-    crossmatch:
-      from:
-        - imdb_list:
-            list: ratings
-            login: '{{ secrets.imdb.login }}'
-            password: '{{ secrets.imdb.password }}'
-      fields:
-        - imdb_id
-      action: reject
     imdb_list:
       login: '{{ secrets.imdb.login }}'
       password: '{{ secrets.imdb.password }}'
       list: watchlist
-    movie_queue:
-      action: add
-      quality: 720p+
+    list_add:
+      - movie_list: watchlist
     template: 
       - no_global # None of the global templates make sense here
       - imdb_watchlist
-    seen: local
 
   # Delete already rated movies from IMDB watchlist
   delete_from_imdb:
     priority: 8
-    imdb_list:
-      login: '{{ secrets.imdb.login }}'
-      password: '{{ secrets.imdb.password }}'
-      list: ratings
-    movie_queue: remove
+    include: 
+      - private/input-ratings.yml
+    list_remove:
+      - movie_list: watchlist
     template: 
       - no_global # None of the global templates make sense here
       - imdb_watchlist
-    seen: local
 
   Movies_watchlist_t411:
     priority: 10
@@ -363,7 +357,7 @@ tasks:
     verify_ssl_certificates:  no
     discover:
       what:
-        - emit_movie_queue: { year: no } 
+        - movie_list: watchlist
       from:
         - cpasbien:
             category: "films"
@@ -391,8 +385,6 @@ tasks:
 
   Movies_watchlist_xt:
     priority: 10
-    torrent_alive:
-      min_seeds: 1
     include:
       - private/input-movies-xt.yml
     template:
@@ -527,7 +519,7 @@ schedules:
   #  interval:
   #   days: 1
 
-  #
+  #Unhandled error in plugin torrent_alive: 'generator' object is not an iterator
   # Subtitles
   #
   #- tasks: [Subtitles]
@@ -551,7 +543,7 @@ schedules:
   #
   # Tv Shows
   #
-  - tasks: [TV-SHOWS_rss, TV-SHOWS_discover]
+  - tasks: [TV-SHOWS_rss, TV-SHOWS_discover, TV-SHOWS_xt]
     interval:
       hours: 4
 
