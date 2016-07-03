@@ -16,6 +16,8 @@ templates:
     #  min_seeds: 15
     #  reject_for: 2 hours
 
+    disable:
+      - private_torrents
     verify_ssl_certificates: no
 
     #deluge:
@@ -39,8 +41,6 @@ templates:
 
     # Limit the frequency of requests to domains so they don't complain about
     # using a bot
-    headers:
-      User-Agent: "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/45.0.2454.85 Safari/537.36"
     domain_delay:
       torrentz.eu: 10 seconds
       bt-chat.com-tv: 5 seconds
@@ -54,7 +54,6 @@ templates:
       yify-torrents.com: 5 seconds
   
   tv:
-    private_torrents: no
     tmdb_lookup: yes
     include:
       - private/series.yml
@@ -67,12 +66,32 @@ templates:
       apikey: '{{ secrets.pushbullet.apikey }}'
       #device: '{{ secrets.pushbullet.device }}'
       title: "{{series_name}} {{series_id}}"
-      body: "{{series_name}} {{series_id}}\n\n{{title}}\n\nSize: {{content_size}}MB" 
+      body: "{{series_name}} {{series_id}}\n\n{{title}}\n\nSize: {{content_size}}MB\n\nDownloaded by: {{task}}" 
 
     # generate RSS feed to send daily mail
     #make_rss:
     #  file: '{{ secrets.rss.file }}'
     #  days: 1
+
+  tv_backfill:
+    series:
+      - Preacher:
+          identified_by: ep
+          tracking: backfill
+          quality: ">=720p"
+    tmdb_lookup: yes
+    disable:
+      - seen
+      - torrent_alive
+      - remember_rejected
+      - retry_failed
+      - private_torrents
+    transmission:
+      path: '{{secrets.transmission.series_movedone}}'
+    pushbullet:
+      apikey: '{{ secrets.pushbullet.apikey }}'
+      title: "{{series_name}} {{series_id}}"
+      body: "{{series_name}} {{series_id}}\n\n{{title}}\n\nSize: {{content_size}}MB\n\nDownloaded by: {{task}}" 
 
   imdb_watchlist:
     seen: local
@@ -111,6 +130,17 @@ templates:
       from: title
     seen_movies: strict # Don't download movies we've already seen
 
+     # Don't download movies in watchlist
+    crossmatch:
+      from:
+        - imdb_list:
+            list: ratings
+            login: '{{ secrets.imdb.login }}'
+            password: '{{ secrets.imdb.password }}'
+      fields:
+        - imdb_id
+      action: reject
+
     # Check for already downloaded manually movies
     exists_movie:
       path:
@@ -131,8 +161,9 @@ templates:
       - imdb_genres
 
     # Filter to accept entries
-    list_accept:
-      - movie_list: watchlist
+    list_match:
+      from:
+        - movie_list: watchlist
 
     if:
       - "'french' == (imdb_languages or ['french'])[0]":
@@ -157,7 +188,7 @@ templates:
     #  file: '{{ secrets.rss.file }}'
     #  days: 1
 
-  subtitled_movies:
+  subtitled:
     if:
       - "'french' != (imdb_languages or ['french'])[0]":
           regexp:
@@ -222,6 +253,8 @@ templates:
   xt_config:
     disable: 
       - torrent_alive
+      - remember_rejected
+      - private_torrents
     manipulate:
       - url:
           replace:
@@ -286,25 +319,55 @@ tasks:
     priority: 5
     include:
       - private/input-tvshows-rss.yml
-    template: tv
+    template: 
+      - tv
+      - subtitled
 
   TV-SHOWS_discover:
     priority: 5
+    include: 
+      - private/config-t411.yml
     discover:
       what:
-        - emit_series: yes
+        - next_series_episodes: yes
       from:
         - t411: 
             category: Série TV
             terms:
-              - HDrip 720
+              - VOSTFR
               - HDrip 1080
-        - kat:
-            category: tv
-            verified: yes
+              - Web-Dl 1080
+              - TVripHD 1080
+              - HDrip 720
+              - Web-DL 720
+              - TVripHD 720
     template:
       - tv
-      - subtitled_movies
+      - subtitled
+
+  TV-SHOWS_backfill:
+    manual: yes
+    include: 
+      - private/config-t411.yml
+    discover:
+      what:
+        - next_series_episodes:
+            backfill: yes
+            from_start: yes
+      from:
+        - t411: 
+            category: Série TV
+            terms:
+              - VOSTFR
+              - HDrip 1080
+              - Web-Dl 1080
+              - TVripHD 1080
+              - HDrip 720
+              - Web-DL 720
+              - TVripHD 720
+    template:
+      - tv_backfill
+      - subtitled
 
   TV-SHOWS_xt:
     priority: 10
@@ -312,8 +375,16 @@ tasks:
       - private/input-tvshows-xt.yml
     template:
       - tv
-      - subtitled_movies
+      - subtitled
       - xt_config
+
+  TV-SHOWS_abn:
+    priority: 10
+    include:
+      - private/input-tvshows-abn.yml
+    template:
+      - tv
+      - subtitled
 
   ###################
   # Movies WatchList
@@ -350,11 +421,13 @@ tasks:
       - private/input-movies-t411.yml
     template:
       - movies
-      - subtitled_movies
+      - subtitled
 
   Movies_watchlist_discover:
     priority: 10
     verify_ssl_certificates:  no
+    include:
+      - private/config-t411.yml
     discover:
       what:
         - movie_list: watchlist
@@ -364,16 +437,14 @@ tasks:
         - t411: 
             category: Film
             terms:
+              - VOSTFR
               - HDrip 720
               - HDrip 1080
-        - kat:
-            category: movies
-            verified: yes
         - torrentz: verified
       release_estimations: ignore
     template:
       - movies
-      - subtitled_movies
+      - subtitled
 
   Movies_watchlist:
     priority: 10
@@ -381,7 +452,7 @@ tasks:
       - private/input-movies-rss.yml
     template:
       - movies
-      - subtitled_movies
+      - subtitled
 
   Movies_watchlist_xt:
     priority: 10
@@ -389,8 +460,16 @@ tasks:
       - private/input-movies-xt.yml
     template:
       - movies
-      - subtitled_movies
+      - subtitled
       - xt_config
+
+  Movies_watchlist_abn:
+    priority: 10
+    include:
+      - private/input-movies-abn.yml
+    template:
+      - movies
+      - subtitled
 
   ###################
   # Movies Discover
@@ -405,7 +484,7 @@ tasks:
     template:
       - movies
       - movies_discover
-      - subtitled_movies
+      - subtitled
 
   Movies_discover_cpasbien:
     priority: 15
@@ -413,7 +492,7 @@ tasks:
     template:
       - movies
       - movies_discover
-      - subtitled_movies
+      - subtitled
       - cpasbien_config
 
   Movies_discover:
@@ -423,7 +502,7 @@ tasks:
     template:
       - movies
       - movies_discover
-      - subtitled_movies
+      - subtitled
 
   Movies_discover_xt:
     priority: 15
@@ -432,8 +511,17 @@ tasks:
     template:
       - movies
       - movies_discover
-      - subtitled_movies
+      - subtitled
       - xt_config
+
+  Movies_discover_abn:
+    priority: 15
+    include:
+      - private/input-movies-abn.yml
+    template:
+      - movies
+      - movies_discover
+      - subtitled
 
   ###################
   # Subtitles
@@ -514,7 +602,6 @@ schedules:
   
   #
   # Notifications
-  #
   #- tasks: [emailfeed]
   #  interval:
   #   days: 1
@@ -543,20 +630,20 @@ schedules:
   #
   # Tv Shows
   #
-  - tasks: [TV-SHOWS_rss, TV-SHOWS_discover, TV-SHOWS_xt]
+  - tasks: [TV-SHOWS_rss, TV-SHOWS_discover, TV-SHOWS_xt, TV-SHOWS_abn]
     interval:
-      hours: 4
+      hours: 3
 
   #
   # Movies Watchlist
   #
-  - tasks: [Movies_watchlist_discover, Movies_watchlist_xt]
+  - tasks: [Movies_watchlist_discover, Movies_watchlist_xt,Movies_watchlist_abn]
     interval:
       hours: 4
 
   #
   # Movies Discover
   #
-  - tasks: [Movies_discover_t411, Movies_discover, Movies_discover_xt]
+  - tasks: [Movies_discover_t411, Movies_discover, Movies_discover_xt, Movies_discover_abn]
     interval:
       hours: 6
