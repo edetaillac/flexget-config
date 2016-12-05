@@ -1,8 +1,7 @@
 web_server:
   bind: 0.0.0.0
   port: 3539
-api: yes
-webui: yes
+  web_ui: yes
 secrets: private/secretfile.yml
 templates:
   global:
@@ -63,10 +62,10 @@ templates:
 
     # Push notification Mobile
     pushbullet:
-      apikey: '{{ secrets.pushbullet.apikey }}'
+      api_key: '{{ secrets.pushbullet.apikey }}'
       #device: '{{ secrets.pushbullet.device }}'
       title: "{{series_name}} {{series_id}}"
-      body: "{{series_name}} {{series_id}}\n\n{{title}}\n\nSize: {{content_size}}MB\n\nDownloaded by: {{task}}" 
+      message: "{{series_name}} {{series_id}}\n\n{{title}}\n\nSize: {{content_size}}MB\n\nDownloaded by: {{task}}" 
 
     # generate RSS feed to send daily mail
     #make_rss:
@@ -89,9 +88,9 @@ templates:
     transmission:
       path: '{{secrets.transmission.series_movedone}}'
     pushbullet:
-      apikey: '{{ secrets.pushbullet.apikey }}'
+      api_key: '{{ secrets.pushbullet.apikey }}'
       title: "{{series_name}} {{series_id}}"
-      body: "{{series_name}} {{series_id}}\n\n{{title}}\n\nSize: {{content_size}}MB\n\nDownloaded by: {{task}}" 
+      message: "{{series_name}} {{series_id}}\n\n{{title}}\n\nSize: {{content_size}}MB\n\nDownloaded by: {{task}}" 
 
   imdb_watchlist:
     seen: local
@@ -150,7 +149,6 @@ templates:
       type: files
       lookup: imdb
   
-    imdb_required: yes
     imdb_lookup: yes
     require_field:
       - imdb_id
@@ -177,10 +175,10 @@ templates:
 
     # Push notification on Mobile
     pushbullet:
-      apikey: '{{ secrets.pushbullet.apikey }}'
+      api_key: '{{ secrets.pushbullet.apikey }}'
       #device: '{{ secrets.pushbullet.device }}'
       title: "{{imdb_name}} {{imdb_year}} ({{imdb_score}})"
-      body: "Genres: {{ imdb_genres|join(', ') }}\n\nTitle: {{title}}\nQuality: {{quality}}\nSize: {{content_size}}MB\n\nDownloaded by: {{task}}"
+      message: "Genres: {{ imdb_genres|join(', ') }}\n\nTitle: {{title}}\nQuality: {{quality}}\nSize: {{content_size}}MB\n\nDownloaded by: {{task}}"
       url: "{% if imdb_url %}{{ imdb_url }}{% endif %}"
 
     # generate RSS feed to send daily mail
@@ -218,28 +216,28 @@ templates:
       - "'comedy' in (imdb_genres or []) and 1 == len(imdb_actors or [])": reject
       - "'french' == (imdb_languages or ['french'])[0]":
           imdb:
-            min_score: 6
+            min_score: 6.4
             min_votes: 150
       - "'french' != (imdb_languages or ['french'])[0]":
           imdb:
-            min_score: 7
+            min_score: 7.4
             min_votes: 300
       # Restrictions Notes on specific genres
       - "'drama' in (imdb_genres or [])":
           imdb:
-            min_score: 7.6
+            min_score: 7.7
             min_votes: 400
       - "'war' in (imdb_genres or [])":
           imdb:
-            min_score: 7.6
+            min_score: 7.7
             min_votes: 400
       - "'romance' in (imdb_genres or [])":
           imdb:
-            min_score: 7.6
+            min_score: 7.7
             min_votes: 400
       - "set(['animation', 'family']).issubset(set(imdb_genres or []))":
           imdb:
-            min_score: 7.7
+            min_score: 7.8
             min_votes: 400
     
   cpasbien_config:
@@ -306,10 +304,10 @@ tasks:
       path: '{{ secrets.dropbox.path }}'
     # Push notification on Mobile
     pushbullet:
-      apikey: '{{ secrets.pushbullet.apikey }}'
+      api_key: '{{ secrets.pushbullet.apikey }}'
       #device: '{{ secrets.pushbullet.device }}'
       title: "Seedbox: {{title}} downloaded\n\n"
-      body: ""
+      message: ""
 
   ###################
   # TV Shows
@@ -345,30 +343,6 @@ tasks:
       - tv
       - subtitled
 
-  TV-SHOWS_backfill:
-    manual: yes
-    include: 
-      - private/config-t411.yml
-    discover:
-      what:
-        - next_series_episodes:
-            backfill: yes
-            from_start: yes
-      from:
-        - t411: 
-            category: Série TV
-            terms:
-              - VOSTFR
-              - HDrip 1080
-              - Web-Dl 1080
-              - TVripHD 1080
-              - HDrip 720
-              - Web-DL 720
-              - TVripHD 720
-    template:
-      - tv_backfill
-      - subtitled
-
   TV-SHOWS_xt:
     priority: 10
     include:
@@ -391,7 +365,7 @@ tasks:
   ###################
  
   # Update IMDB watchlist
-  queue_from_imdb:
+  Movies_queue_add_from_imdb:
     priority: 8
     imdb_list:
       login: '{{ secrets.imdb.login }}'
@@ -404,7 +378,7 @@ tasks:
       - imdb_watchlist
 
   # Delete already rated movies from IMDB watchlist
-  delete_from_imdb:
+  Movies_queue_delete_from_imdb:
     priority: 8
     include: 
       - private/input-ratings.yml
@@ -440,7 +414,6 @@ tasks:
               - VOSTFR
               - HDrip 720
               - HDrip 1080
-        - torrentz: verified
       release_estimations: ignore
     template:
       - movies
@@ -485,15 +458,6 @@ tasks:
       - movies
       - movies_discover
       - subtitled
-
-  Movies_discover_cpasbien:
-    priority: 15
-    #only_new: yes
-    template:
-      - movies
-      - movies_discover
-      - subtitled
-      - cpasbien_config
 
   Movies_discover:
     priority: 15
@@ -550,43 +514,14 @@ tasks:
       languages:
         - fra
       exact_match: yes
-
-  ###################
-  # EMAILS NOTIFICATIONS
-  ###################
-
-  emailfeed:
-    priority: 25
-    template: no_global # None of the global templates make sense here
-    rss:
-      url: '{{ secrets.rss.file }}'
-    disable:
-      - transmission
-      - seen        
-      - retry_failed
-    metainfo_series: yes # required for tvdb lookup to work, email template to function correctly
-    thetvdb_lookup: yes
-    imdb_lookup: yes
-    tmdb_lookup: yes
-    accept_all: yes
-    email:
-      from: '{{ secrets.email.from }}'
-      to: '{{ secrets.email.to }}'
-      smtp_host: '{{ secrets.email.smtp_host }}'
-      smtp_port: 587
-      smtp_username: '{{ secrets.email.smtp_username }}'
-      smtp_password: '{{ secrets.email.smtp_password }}'
-      smtp_tls: yes
-      subject: '{{ secrets.email.subject }}'
-      template: '{{ secrets.email.template }}'
   
-  stopSeeding:
+  StopSeeding:
     clean_transmission:
       port: 8072
       host: localhost
       username: '{{ secrets.transmission.username }}'
       password: '{{ secrets.transmission.password }}'
-      min_ratio: 6
+      min_ratio: 4
     template: no_global
     disable: [details]
       
@@ -616,34 +551,27 @@ schedules:
   #
   # IMDB Watchlist update
   #
-  - tasks: [queue_from_imdb, stopSeeding]
+  - tasks: [Movies_queue_*, StopSeeding]
     interval:
       hours: 4
-
-  #
-  # IMDB Watchlist matching ratings List & cleanTransmission
-  #
-  - tasks: [delete_from_imdb]
-    interval:
-      days: 1
       
   #
   # Tv Shows
   #
-  - tasks: [TV-SHOWS_rss, TV-SHOWS_discover, TV-SHOWS_xt, TV-SHOWS_abn]
+  - tasks: [TV-SHOWS_*]
     interval:
       hours: 3
 
   #
   # Movies Watchlist
   #
-  - tasks: [Movies_watchlist_discover, Movies_watchlist_xt,Movies_watchlist_abn]
+  - tasks: [Movies_watchlist*]
     interval:
       hours: 4
 
   #
   # Movies Discover
   #
-  - tasks: [Movies_discover_t411, Movies_discover, Movies_discover_xt, Movies_discover_abn]
+  - tasks: [Movies_discover_*]
     interval:
       hours: 6
