@@ -35,7 +35,9 @@ templates:
     magnets: no
   
   tv:
-    tmdb_lookup: yes
+    thetvdb_lookup: yes
+    require_field:
+      - tvdb_language
     include:
       - private/series.yml
     transmission:
@@ -145,7 +147,7 @@ templates:
 
   subtitled:
     if:
-      - "'french' != (imdb_languages or ['french'])[0]":
+      - (imdb_languages and not 'french' in imdb_languages) or (tvdb_language and 'french' != tvdb_language):
           regexp:
             reject_excluding:
               # Only accept VOSTFR or Multi sub
@@ -441,6 +443,11 @@ tasks:
         - '(?x) [\W_] (?: french | VOSTFR | Multi | sample ) (?:\.|_|\b)'
       from: url
     subliminal:
+      providers:
+        - addic7ed
+        - opensubtitles
+        - podnapisi
+        - tvsubtitles
       authentication:
         addic7ed:
           username: '{? subtitles.addic7ed.username ?}'
