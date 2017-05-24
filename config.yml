@@ -147,7 +147,13 @@ templates:
 
   subtitled:
     if:
-      - (imdb_languages and not 'french' in imdb_languages) or (tvdb_language and 'french' != tvdb_language):
+      - imdb_languages and not 'french' in imdb_languages:
+          regexp:
+            reject_excluding:
+              # Only accept VOSTFR or Multi sub
+              - '(?x) [\W_] (?: VOSTFR | MULTISUB | MULTI ) (?:\.|_|\b)'
+            from: title
+      - tvdb_language and 'french' != tvdb_language:
           regexp:
             reject_excluding:
               # Only accept VOSTFR or Multi sub
