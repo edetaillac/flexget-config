@@ -53,12 +53,13 @@ templates:
           - pushbullet:
               api_key: '{? pushbullet.apikey ?}'
       
-  imdb_watchlist:
-    seen: local
+  imdb_list:
     retry_failed:
       max_retries: 10
+    seen: local
     accept_all: yes
     no_entries_ok: yes
+    imdb_lookup: yes
     disable:
       - download
       - transmission
@@ -66,40 +67,12 @@ templates:
       - retry_failed
 
   movies:
-    quality: 720p+
+    quality:
+      - 720p-1080p
+      - hdtv-bluray
     content_size: { min: 1000, max: 15000 }
-    regexp:
-      reject:
-        # Avoid certain groups.
-        - '(?x) [\W_] (?: maxspeed | tnt[\W_]*village | cocain | wdr | msd | nnd | thc | ssdd | crys ) $'
-        # I don't have any 3D displays
-        - \b3-?D\b
-        # Flexget doesn't recognize "line" as an audio quality.
-        - '(?x) [\W_] (?: line ) (?:\.|_|\b)'
-        # Avoid Series Episodes
-        - s\d+e\d+
-        - '(?x) [\W_] (?: screener ) (?:\.|_|\b)'
-        - '(?x) [\W_] (?: trailer ) (?:\.|_|\b)'
-        - '(?x) [\W_] (?: R5 ) (?:\.|_|\b)'                      
-        - '(?x) [\W_] (?: TS ) (?:\.|_|\b)'
-        - '(?x) [\W_] (?: WEBSCR ) (?:\.|_|\b)'                            
-        - '(?x) [\W_] (?: Cam ) (?:\.|_|\b)'
-        - '(?x) [\W_] (?: CamRip ) (?:\.|_|\b)'
-        # Reject rar/packs/password
-        - \.rar|\.r\d\d|password.txt|\.zip
-      from: title
-    seen_movies: strict # Don't download movies we've already seen
-
-    # Don't download movies in watchlist
-    crossmatch:
-      from:
-        - imdb_list:
-            list: ratings
-            login: '{? imdb.login ?}'
-            password: '{? imdb.password ?}'
-      fields:
-        - imdb_id
-      action: reject
+    seen_movies: strict
+    #proper_movies: yes
 
     # Check for already downloaded manually movies
     exists_movie:
@@ -118,11 +91,6 @@ templates:
       - imdb_url
       - imdb_languages
       - imdb_genres
-
-    # Filter to accept entries
-    list_match:
-      from:
-        - movie_list: watchlist
 
     set:
       content_filename: "{{ imdb_name|replace('/', '_')|replace(':', ' -') }} ({{ imdb_year }}) - {{ quality }}"
@@ -160,16 +128,18 @@ templates:
               - '(?x) [\W_] (?: VOSTFR | MULTISUB | MULTI ) (?:\.|_|\b)'
             from: title
 
-  movies_discover:
-     # Don't download movies in watchlist
-    crossmatch:
+  movies_watchlist:
+    # Download movies in watchlist
+    list_match:
       from:
-        - imdb_list:
-            list: watchlist
-            login: '{? imdb.login ?}'
-            password: '{? imdb.password ?}'
-      fields:
-        - imdb_id
+        - movie_list: watchlist
+
+  movies_discover:
+    # Don't download movies in watchlist
+    list_match:
+      remove_on_match: no
+      from:
+        - movie_list: watchlist
       action: reject
 
     if:
@@ -196,6 +166,10 @@ templates:
             min_score: 7.8
             min_votes: 400
 
+  abn_config:
+    headers:
+      User-Agent: "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:54.0) Gecko/20100101 Firefox/54.0"
+
   xt_config:
     disable: 
       - torrent_alive
@@ -210,25 +184,25 @@ templates:
 tasks:
   
   # Specific Task to download monthly newspaper
-  PressTorrent:
-    priority: 15
-    t411:
-      category: Presse
-    only_new: yes
-    disable: 
-      - inputs
-      - content_size
-      - torrent_alive
-    regexp:
-      accept:
-        - '60 millions de consommateurs'
-        - 'What Hi-Fi'
-        - 'Marmiton'
-        - ca m'interesse
-    exists:
-      - '{? press.exists ?}'
-    set:
-      path: '{? press.path ?}'
+  #PressTorrent:
+  #  priority: 15
+  #  t411:
+  #    category: Presse
+  #  only_new: yes
+  #  disable: 
+  #    - inputs
+  #    - content_size
+  #    - torrent_alive
+  #  regexp:
+  #    accept:
+  #      - '60 millions de consommateurs'
+  #      - 'What Hi-Fi'
+  #      - 'Marmiton'
+  #      - ca m'interesse
+  #  exists:
+  #    - '{? press.exists ?}'
+  #  set:
+  #    path: '{? press.path ?}'
 
   # Search torrent on Dropbox specific synchronised directory
   DropboxTorrent:
@@ -276,27 +250,28 @@ tasks:
       - tv
       - subtitled
 
-  TV-SHOWS_discover:
-    priority: 5
-    include: 
-      - private/config-t411.yml
-    discover:
-      what:
-        - next_series_episodes: yes
-      from:
-        - t411: 
-            category: Série TV
-            terms:
-              - VOSTFR
-              - HDrip 1080
-              - Web-Dl 1080
-              - TVripHD 1080
-              - HDrip 720
-              - Web-DL 720
-              - TVripHD 720
-    template:
-      - tv
-      - subtitled
+  #TV-SHOWS_discover:
+  #  priority: 5
+  #  include: 
+  #    - private/config-t411.yml
+  #  discover:
+  #    what:
+  #      - next_series_episodes: yes
+  #    from:
+  #      - t411: 
+  #          category: Série TV
+  #          max_results: 200
+  #          terms:
+  #            - VOSTFR
+  #            - HDrip 1080
+  #            - Web-Dl 1080
+  #            - TVripHD 1080
+  #            - HDrip 720
+  #            - Web-DL 720
+  #            - TVripHD 720
+  #  template:
+  #    - tv
+  #    - subtitled
 
   TV-SHOWS_xt:
     priority: 10
@@ -316,11 +291,10 @@ tasks:
       - subtitled
 
   ###################
-  # Movies WatchList
+  # Movies Lists
   ###################
  
-  # Update IMDB watchlist
-  Movies_queue_add_from_imdb:
+  Movies_list_watch_add_from_imdb:
     priority: 8
     imdb_list:
       login: '{? imdb.login ?}'
@@ -330,10 +304,20 @@ tasks:
       - movie_list: watchlist
     template: 
       - no_global # None of the global templates make sense here
-      - imdb_watchlist
+      - imdb_list
+      
+  Movies_list_rating_add_from_imdb:
+    priority: 8
+    include: 
+      - private/input-ratings.yml
+    list_add:
+      - movie_list: ratinglist
+    template: 
+      - no_global # None of the global templates make sense here
+      - imdb_list
 
   # Delete already rated movies from IMDB watchlist
-  Movies_queue_delete_from_imdb:
+  Movies_list_watch_delete_from_imdb:
     priority: 8
     include: 
       - private/input-ratings.yml
@@ -341,22 +325,28 @@ tasks:
       - movie_list: watchlist
     template: 
       - no_global # None of the global templates make sense here
-      - imdb_watchlist
+      - imdb_list
 
-  Movies_watchlist_t411:
-    priority: 10
-    t411: 
-      category: Film
-      terms:
-        - VOSTFR
-        - HDrip 720
-        - HDrip 1080
-    template:
-      - movies
-      - subtitled
+  ###################
+  # Movies WatchList
+  ###################
+
+  #Movies_watchlist_t411:
+  #  priority: 10
+  #  t411: 
+  #    category: Film
+  #    max_results: 200
+  #    terms:
+  #      - VOSTFR
+  #      - HDrip 720
+  #      - HDrip 1080
+  #  template:
+  #    - movies
+  #    - subtitled
 
   Movies_watchlist:
     priority: 10
+    max_reruns: 0
     include:
       - private/input-movies-rss.yml
     template:
@@ -365,40 +355,46 @@ tasks:
 
   Movies_watchlist_xt:
     priority: 10
+    max_reruns: 0
     include:
       - private/input-movies-xt.yml
     template:
       - movies
+      - movies_watchlist
       - subtitled
       - xt_config
 
   Movies_watchlist_abn:
     priority: 10
+    max_reruns: 0
     include:
       - private/input-movies-abn.yml
     template:
       - movies
       - subtitled
+      - abn_config
 
   ###################
   # Movies Discover
   ###################
 
-  Movies_discover_t411:
-    priority: 15
-    t411: 
-      category: Film
-      terms:
-        - VOSTFR
-        - HDrip 720
-        - HDrip 1080
-    template:
-      - movies
-      - movies_discover
-      - subtitled
+ # Movies_discover_t411:
+ #   priority: 15
+ #   t411: 
+ #     category: Film
+ #     max_results: 200
+ #     terms:
+ #       - VOSTFR
+ #       - HDrip 720
+ #       - HDrip 1080
+ #   template:
+ #     - movies
+ #     - movies_discover
+ #     - subtitled
 
   Movies_discover:
     priority: 15
+    max_reruns: 0
     include:
       - private/input-movies-rss.yml
     template:
@@ -408,6 +404,7 @@ tasks:
 
   Movies_discover_xt:
     priority: 15
+    max_reruns: 0
     include:
       - private/input-movies-xt.yml
     template:
@@ -418,12 +415,14 @@ tasks:
 
   Movies_discover_abn:
     priority: 15
+    max_reruns: 0
     include:
       - private/input-movies-abn.yml
     template:
       - movies
       - movies_discover
       - subtitled
+      - abn_config
 
   ###################
   # Subtitles
@@ -495,27 +494,27 @@ schedules:
   #
   # IMDB Watchlist update
   #
-  - tasks: [Movies_queue_*, StopSeeding]
-    interval:
-      hours: 4
+  - tasks: [Movies_list*, StopSeeding]
+    schedule:
+      hour: 6-23/4
       
   #
   # Tv Shows
   #
   - tasks: [TV-SHOWS_*]
-    interval:
-      hours: 3
-
+    schedule:
+      hour: 6-23/2
+      
   #
   # Movies Watchlist
   #
   - tasks: [Movies_watchlist*]
-    interval:
-      hours: 4
+    schedule:
+      hour: 6-23/2
 
   #
   # Movies Discover
   #
-  - tasks: [Movies_discover_*, PressTorrent]
-    interval:
-      hours: 6
+  - tasks: [Movies_discover_*]
+    schedule:
+      hour: 6-23/3
